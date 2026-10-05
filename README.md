@@ -1,291 +1,388 @@
-# Powder Flow Measurement System
+# Powder Characterizer
+
+> [!WARNING]
+> **Hardware integration is not yet complete.**
+>
+> The physical wiring of the dispenser, Balance, and camera has not yet been
+> corrected and verified. The software services and Web UI can be started, but
+> commands that operate physical devices have not yet passed hardware
+> acceptance testing. Do not assume that physical device control is currently
+> available or safe.
+
+## Current TODOs
+
+- [ ] Correct and document the physical device wiring.
+- [ ] Complete hardware acceptance tests for the dispenser, Balance, and camera.
+- [ ] Validate the complete automated experiment and data-storage flow on the
+      assembled instrument.
+- [ ] Optimize and validate the angle-of-repose image-analysis algorithm against
+      representative powders and imaging conditions.
+- [ ] Review the granularity of the public SiLA 2 commands after hardware and
+      external-system integration testing.
+- [ ] Improve the first Web UI release, especially device-state visibility,
+      operator guidance, validation, and error handling.
 
 ## Overview
 
-This system automatically evaluates powder flowability using a Raspberry Pi-based dispensing device.
-It measures the following properties and classifies them according to standard criteria:
+Powder Characterizer is a Raspberry Pi-based system for automatically
+evaluating powder flowability. It measures or derives:
 
-- Bulk density and tapped density
-- Hausner Ratio and Hausner Class
-- Angle of repose and repose class
+- calibration mass per dispensing step;
+- bulk density;
+- tapped density;
+- Hausner Ratio and Hausner Class; and
+- angle of repose and repose class.
 
-Results are saved as CSV/JSON files and accumulated in the on-device Material DB for comparison across materials and runs.
+The production architecture uses two SiLA 2 layers. The upper process layer
+implements the measurement algorithms and coordinates the experiment. The
+lower device layer exposes the Balance, dispenser, and camera as independent
+SiLA 2 devices.
 
----
+Results can be reviewed in the Web UI and saved as JSON, CSV, and image
+artifacts. Selected results can also be accumulated in the on-device Material
+DB.
 
-## Connecting to the Device
+## System Architecture
 
-Connect your computer and the Raspberry Pi to the **same local network**, then open a terminal and run:
+```text
+External SiLA 2 system                         Browser
+          |                                      |
+          | SiLA 2                               | HTTP / WebSocket
+          |                                      v
+          |                              Web UI Gateway (:8000)
+          |                                      |
+          |                                      | SiLA 2 client
+          +------------------+-------------------+
+                             v
+              Layer 2 - Process / Application Layer
+                Powder Characterizer Server (:50065)
+            Measurement algorithms, workflow, state,
+                 abort handling, and result handling
+                             |
+                             | SiLA 2 clients
+             +---------------+---------------+
+             |               |               |
+             v               v               v
+       Balance Server   Dispenser Server   Camera Server
+          (:50052)         (:50063)         (:50064)
+             |               |               |
+             +---------------+---------------+
+                             v
+                    Layer 1 - Device Layer
+             Device drivers / hardware interfaces
+             |               |               |
+          PySerial      I2C, GPIO,       rpicam-still
+                       and MotorKit
+             |               |               |
+             v               v               v
+          Balance         Dispenser         Camera
+```
+
+The Web UI Gateway is an HTTP/WebSocket-to-SiLA adapter. It is not a third
+SiLA 2 layer.
+
+### Layer 2: process and application control
+
+The Powder Characterizer Server is the normal integration point for the Web UI
+and external automation. It combines lower-level device commands into complete
+measurement workflows, manages run state, propagates abort requests, and keeps
+completed results pending until the operator saves or discards them.
+
+External systems that want to run a powder characterization process should
+normally connect to this server on port `50065`.
+
+### Layer 1: device control
+
+Each device server owns one physical device and exposes hardware operations
+through a SiLA 2 feature:
+
+- the Balance Server owns serial communication with the Balance;
+- the Dispenser Server owns the Motor Bonnet, the I2C connection, and the index
+  sensor on GPIO4; and
+- the Camera Server owns camera capture.
+
+Conceptually, each device server is a SiLA 2 wrapper around a device driver or
+hardware API. The implementation is not always a thin wrapper around a legacy
+Python file:
+
+- the Dispenser Server contains a dedicated driver that preserves the motion
+  constants and sequencing of `p_dispenser_HAT_api.py` while directly using
+  I2C, GPIO, and MotorKit;
+- the Camera Server contains a dedicated driver that invokes `rpicam-still` and
+  returns the captured bytes; and
+- the existing Balance Server, maintained in a separate repository, wraps its
+  serial `BalanceInterface` driver.
+
+Layer 1 servers may be called directly during device maintenance, diagnostics,
+and hardware acceptance testing. Process-level integrations should use Layer 2
+unless direct device access is specifically required.
+
+## Processes and Ports
+
+| Process | Default port | Layer | Responsibility |
+|---|---:|---|---|
+| Existing Balance Server | `50052` | Device | Serial Balance ownership |
+| Powder Characterizer Dispenser Server | `50063` | Device | Motor Bonnet, I2C, and GPIO4 ownership |
+| Powder Characterizer Camera Server | `50064` | Device | Camera ownership and image transport |
+| Powder Characterizer Server | `50065` | Process | Measurement workflows, state, abort, and results |
+| Web UI Gateway | `8000` | Gateway | Browser HTTP/WebSocket interface |
+
+Server endpoints and ports are deployment environment variables. They are not
+stored in `config/app_settings.json` and are not result or Material DB fields.
+See `deploy/powder-flow.env.example`.
+
+## Public SiLA 2 Interfaces
+
+> [!IMPORTANT]
+> The command names below match the identifiers currently exposed by the SiLA 2
+> feature definitions. They document the current integration surface, not a
+> permanently frozen API. The command boundaries and granularity may change as
+> the physical instrument is validated and external-system requirements become
+> clearer.
+
+### Powder Characterizer Server (`:50065`)
+
+Feature identifier: `PowderCharacterizer`
+
+Definition:
+`sila2_servers/powder_characterizer_server/PowderCharacterizer.sila.xml`
+
+| Type | SiLA 2 identifier | Purpose |
+|---|---|---|
+| Property | `CurrentRun` | Return the current state, stage, progress, elapsed time, logs, result, and error as JSON. |
+| Command | `RunAutomatedExperiment` | Run the complete powder-characterization workflow. |
+| Command | `RunCalibration` | Run only the calibration workflow. |
+| Command | `RunBulkDensity` | Run only the bulk-density workflow. |
+| Command | `RunTappedDensity` | Run only the tapped-density workflow. |
+| Command | `RunAngleOfRepose` | Run only the angle-of-repose workflow. |
+| Command | `RunSingleTest` | Run a named single-test stage. |
+| Command | `RunManualExperiment` | Run the current manual dispensing workflow. |
+| Command | `ClearClog` | Run the fixed dispenser clog-clearing operation. |
+| Command | `CaptureCameraPreview` | Capture a preview through the Camera Server. |
+| Command | `CaptureReposePreview` | Capture and crop the repose preview. |
+| Command | `AbortCurrentOperation` | Cancel the workflow and propagate `StopAll` to the Dispenser Server. |
+| Command | `SaveResults` | Save the pending result and optionally update the Material DB. |
+| Command | `DiscardResults` | Discard the pending result. |
+| Command | `GetSettings` | Return the application settings JSON. |
+| Command | `UpdateSettings` | Validate and persist the application settings JSON. |
+| Command | `GetMaterialDatabase` | Return the Material DB JSON. |
+| Command | `GetArtifact` | Return a pending or saved run artifact. |
+
+The observable run commands provide intermediate state updates and a final
+result. `CurrentRun` can also be polled when a client does not consume
+intermediate responses.
+
+### Powder Characterizer Dispenser Server (`:50063`)
+
+Feature identifier: `PowderCharacterizerDispenser`
+
+Definition:
+`sila2_servers/powder_characterizer_dispenser_server/PowderCharacterizerDispenser.sila.xml`
+
+| Type | SiLA 2 identifier | Purpose |
+|---|---|---|
+| Property | `Status` | Report `starting`, `discovering`, `waiting_for_device`, `ready`, `busy`, `recovering`, or `fault`. |
+| Command | `IndexChamber` | Advance one chamber using the IR sensor and timeout protection. |
+| Command | `Vibrate` | Run the vibration motor at a configured level for a duration. |
+| Command | `VibrateWithAuger` | Run vibration and the forward auger together. |
+| Command | `RunAllMotors` | Run M1, M2, and M3, then perform one indexed step. |
+| Command | `StopAll` | Request cancellation and stop every motor. |
+| Command | `Close` | Stop motors and release hardware resources during shutdown or maintenance. |
+
+The dispenser does not use a configured I2C address or a hard-coded candidate
+range. It scans the full bus, ignores `0x70` when it is the PCA9685 All Call
+response, and accepts the one remaining individual address. No individual
+device produces `waiting_for_device`; multiple individual addresses produce an
+explicit ambiguity fault.
+
+### Powder Characterizer Camera Server (`:50064`)
+
+Feature identifier: `PowderCharacterizerCamera`
+
+Definition:
+`sila2_servers/powder_characterizer_camera_server/PowderCharacterizerCamera.sila.xml`
+
+| Type | SiLA 2 identifier | Purpose |
+|---|---|---|
+| Property | `Status` | Report the Camera Server state. |
+| Command | `Capture` | Capture a JPEG using requested rotation, autofocus mode, and lens position. |
+| Command | `CaptureRepose` | Capture a PNG using the angle-of-repose camera settings. |
+
+The commands return the original image bytes together with media type,
+suggested filename, width, and height.
+
+### Existing Balance Server (`:50052`)
+
+Feature identifier used by this project: `Balance`
+
+The Balance Server is maintained in the separate
+`/home/sdl-5/balance_sila_server` repository. Powder Characterizer currently
+uses the following interface:
+
+| Type | SiLA 2 identifier | Purpose |
+|---|---|---|
+| Property | `Status` | Return the current Balance state. |
+| Command | `ReadWeight` | Read a stabilized weight. |
+| Command | `ReadWeightImmediate` | Read the current weight without the normal settling delay. |
+| Command | `Tare` | Tare the Balance. |
+| Command | `Close` | Close the Balance hardware connection; reserved for maintenance and server shutdown. |
+
+Normal process workflows do not call `Balance.Close`. They close only their
+SiLA client channel so that the shared Balance Server remains available for the
+next experiment.
+
+## Control Paths
+
+### Web UI
+
+The current Web UI always calls the Layer 2 Powder Characterizer Server. Even
+operations that appear device-specific, such as manual dispensing, clog
+clearing, and camera preview, are exposed as Layer 2 commands and delegated to
+the appropriate Layer 1 server.
+
+```text
+Browser
+  -> web_ui_gateway/app.py
+  -> web_ui_gateway/sila_client.py
+  -> Powder Characterizer Server
+  -> selected device server or complete workflow
+```
+
+The browser does not connect directly to ports `50052`, `50063`, or `50064`.
+
+### External automation
+
+Process-level automation should use the `PowderCharacterizer` feature on port
+`50065`. Direct Layer 1 connections remain available for diagnostics, device
+commissioning, and acceptance testing.
+
+### Legacy PySide GUI
+
+The previous PySide GUI is retained for legacy development. It uses
+`operation/local_devices.py` and accesses local hardware directly; it does not
+use the Layer 2 SiLA 2 server. Do not run it at the same time as the production
+SiLA 2 stack because both paths may attempt to own the same hardware.
+
+## Web UI: Current Capabilities
+
+The Web UI is the first browser-based version of the functionality that was
+previously provided by the local PySide application. It is operational but is
+expected to require further usability and hardware-integration improvements.
+
+The current Web UI provides:
+
+- experiment and material settings;
+- complete automated evaluation;
+- individual calibration, bulk-density, tapped-density, and angle-of-repose
+  tests;
+- manual dispensing and clog clearing;
+- camera and repose previews;
+- live run state, progress, elapsed time, and log updates;
+- result JSON and generated image artifacts;
+- save and discard actions, including optional Material DB updates; and
+- Material DB viewing.
+
+The experiment continues in the Powder Characterizer Server if the browser is
+closed or temporarily disconnected. Reconnecting the browser retrieves the
+current run state.
+
+## Connecting to the Raspberry Pi
+
+Connect the computer and Raspberry Pi to the same local network, then use:
 
 ```bash
 ssh sdl-5@dispensercontroller.local
 ```
 
 | Item | Value |
-|------|-------|
+|---|---|
 | Hostname | `dispensercontroller.local` |
 | Username | `sdl-5` |
-| Password | `Let'sFormulate5` |
 
----
+Credentials must be distributed separately and must not be stored in this
+repository.
 
-## Starting the Application
+## Starting the Production Stack
 
-The supported production path is now the two-layer SiLA 2 stack plus Web UI.
-Install and enable the units in `deploy/systemd`, then browse to:
+The supported production path is the two-layer SiLA 2 stack plus the Web UI.
+Deployment instructions and systemd unit files are in `deploy/`.
+
+On the Raspberry Pi, the existing deployment checkout remains at
+`/home/sdl-5/powder-flow` for compatibility with the installed systemd units.
+The directory name does not need to match the GitHub repository name.
+
+After the services are installed and `powder-flow.target` is enabled, open:
 
 ```text
-RPi:     http://localhost:8000
-Laptop: http://dispensercontroller.local:8000
+Raspberry Pi: http://localhost:8000
+Laptop:       http://dispensercontroller.local:8000
 ```
 
-For gateway-only development, with the SiLA 2 servers already running:
+For gateway-only development, with all SiLA 2 servers already running:
 
 ```bash
 ./run_web.sh
 ```
 
-The old PySide application can still be launched for legacy development, but it
-is not the hardware acceptance-test path:
+The legacy desktop application can still be started for isolated development:
 
 ```bash
 cd ~/powder-flow
 ./run_app_desktop.sh
 ```
 
-This script activates the Python virtual environment and launches the GUI.
-The application window is 800 × 480 px and is optimized for the device's touchscreen display.
+It is not the production or hardware-acceptance path and must not run
+concurrently with the SiLA 2 device servers.
 
-### SiLA 2 process layout
+## Result and Configuration Files
 
-| Process | Default port | Responsibility |
-|---------|--------------|----------------|
-| Existing Balance Server | 50052 | Serial balance ownership |
-| Powder Characterizer Dispenser Server | 50063 | Motor Bonnet + GPIO4 ownership |
-| Powder Characterizer Camera Server | 50064 | Camera ownership and unchanged image bytes |
-| Powder Characterizer Server | 50065 | Existing workflows, state, abort, pending results |
-| Web UI Gateway | 8000 | HTTP/WebSocket and browser UI |
-
-Server endpoints and ports are deployment environment variables; they are not
-stored in `config/app_settings.json` and are not result or Material DB keys. See
-`deploy/powder-flow.env.example`.
-
-The dispenser server scans the full I2C bus. It ignores `0x70` when that address
-is the PCA9685 All Call response and selects the one remaining individual
-address. It does not use a configured address or a hard-coded candidate range.
-Zero devices produces `waiting_for_device`; multiple individual addresses
-produce an explicit ambiguity fault.
-
----
-
-## Application Screens
-
-The app has three layers:
-
-| Screen | When shown |
-|--------|-----------|
-| **Tab screen** | Default; for configuration and data review |
-| **Run screen** | During an automated experiment |
-| **Result screen** | After an experiment finishes |
-
----
-
-## Tab Screen
-
-### Setup Mode (default tab)
-
-Configure an experiment before running it.
-
-| Field | Description |
-|-------|-------------|
-| **Material name** | Select from the dropdown or type a new name |
-| **Disk ID** | Select the dispensing disk currently installed in the hardware |
-| **Candidate vibration levels** | Check one or more levels (1 = weakest, 5 = strongest) |
-| **Candidate vibration times** | Check one or more durations: 1 s, 2 s, or 3 s |
-| **Dose count for evaluation** | Number of doses per vibration level/time combination (3–20) |
-| **Dose count for stability test** | Number of doses for the stability/calibration phase (3–20) |
-
-> All settings are saved **automatically** when changed. There is no separate Save button in Setup Mode.
-
-Press **Start Automated Evaluation** to begin the full measurement sequence.
-The screen switches to the Run screen immediately.
-
----
-
-### Manual Mode
-
-Run a single dispensing sequence with custom settings for inspection or troubleshooting.
-Results from Manual Mode are **not** saved as experiment records.
-
-| Control | Description |
-|---------|-------------|
-| **Vibration level** | Select one value (0–5); 0 = no vibration |
-| **Vibration time** | Select one duration (1 s, 2 s, 3 s) |
-| **Dose count** | Number of doses to dispense |
-| **Camera focus** | Auto or Manual; manual mode requires a lens position value (0.0–32.0) |
-| **Run** | Execute the manual dispensing sequence |
-| **Clog Clear** | Run a clog-clearing sequence if the nozzle appears blocked |
-| **Capture Image** | Take a single camera image without dispensing |
-
----
-
-### Single Test Mode
-
-Run individual measurement stages independently, using the current **Setup Mode** settings.
-Useful for checking one property at a time, or for re-running a stage that failed in a full experiment.
-
-| Button | Description |
-|--------|-------------|
-| **Calibration** | Measures step mass at each candidate vibration level and time |
-| **Angle of Repose** | Captures and analyzes the powder pile angle |
-| **Tapped Density** | Measures density after vibration compaction |
-| **Bulk Density** | Measures density under gentle vibration |
-| **Dispense Once** | Dispenses a single dose (useful for priming the nozzle) |
-| **Capture Image** | Takes a single camera image for visual inspection |
-
-> Update settings in Setup Mode **before** running single tests if you need different conditions.
-> Results can be saved individually and are stored under `logs/experiments/single/`.
-
----
-
-### Material DB
-
-Displays all accumulated measurement results, grouped by material name.
-
-Use the **Material** dropdown to select a material.
-The table shows all records for that material, including:
-
-- Disk ID and disk volume (mL)
-- Vibration level and time used
-- Step mass mean and standard deviation
-- Bulk density, tapped density, Hausner Ratio, and Hausner Class
-- Angle of repose and repose class
-
-Press **Refresh** to reload after new results have been saved.
-
----
-
-## Run Screen
-
-Shown automatically after pressing **Start Automated Evaluation**.
-
-The screen displays:
-- Run datetime and elapsed time
-- Current material name and disk ID
-- Vibration level/time combinations under evaluation
-- Live log output
-
-**Abort** — stops the experiment immediately.
-Use only if necessary; the hardware may be mid-cycle and may need to be checked manually before restarting.
-
-After the experiment finishes, the screen transitions automatically to the Result screen.
-Press **Run Same Conditions Again** if you want to repeat the same experiment without returning to Setup Mode.
-
----
-
-## Result Screen
-
-Review the result before deciding whether to keep it.
-
-| Area | Description |
-|------|-------------|
-| **Summary** (left, 3 pages) | Navigate with `< >` buttons: *Success* (pass/fail per stage), *Calibration* (step mass per vib level/time), *Flowability* (densities, Hausner Ratio, angle of repose) |
-| **Preview images** (right) | Images captured during the experiment; navigate with `< >` if multiple |
-| **Raw JSON** | Full result data for detailed inspection |
-
-Press **Save Results** to write the result files and update the Material DB.
-Press **Discard Results** to discard the data and return to Setup Mode without saving.
-
-> You **must** press either Save or Discard to return to the Setup screen.
-
----
-
-## Output Files
+Results are held as pending data after a run. Selecting **Save Results** writes
+the result files. Selecting **Update Material DB on save** also updates the
+cumulative Material DB.
 
 | Location | Contents |
-|----------|----------|
-| `logs/experiments/all/<timestamp>_<material>/` | Full experiment results (CSV + JSON + images) |
-| `logs/experiments/single/<timestamp>_<material>_<stage>/` | Single test results |
-| `config/material_database.json` | Cumulative Material DB (updated on save) |
-| `config/app_settings.json` | Current Setup Mode settings (auto-saved) |
-
----
+|---|---|
+| `logs/experiments/all/<run_id>/` | Complete automated result JSON, CSV files, plots, and images |
+| `logs/experiments/single/<timestamp>_<material>_<stage>/` | Saved individual-test results |
+| `config/material_database.json` | Cumulative per-material records, updated only when requested on save |
+| `config/app_settings.json` | Current Web UI and workflow settings |
+| `config/disk_master.csv` | Disk ID to volume lookup table |
+| `config/P_calibration.csv` and `.json` | Calibration exports for external use |
 
 ## Repository Structure
 
-```
-powder-flow/
-├── app/                        # GUI application code
-│   ├── main.py                 # Entry point; manages screen transitions
-│   ├── views/                  # One file per screen/tab
-│   │   ├── setup.py            # Setup Mode
-│   │   ├── run.py              # Run screen (during experiment)
-│   │   ├── result.py           # Result screen (review / save / discard)
-│   │   ├── manual.py           # Manual Mode
-│   │   ├── single_test.py      # Single Test Mode
-│   │   └── material_db.py      # Material DB
-│   └── widgets/                # Reusable touch-friendly UI components
-│
-├── config/                     # Device configuration files
-│   ├── app_settings.json       # Current Setup Mode settings (auto-updated by the app)
-│   ├── disk_master.csv         # Disk ID → volume (mL) look-up table
-│   ├── material_database.json  # Per-material calibration and flowability results
-│   │                           #   (updated automatically on each save)
-│   ├── P_calibration.csv       # Calibration export for use by external systems
-│   └── P_calibration.json      #   (optimal vibration condition + step mass per material/disk)
-│
-├── hardware_api/               # Hardware interface modules
-│   ├── balance/
-│   │   └── balance_api.py      # USB balance communication
-│   ├── camera/
-│   │   └── camera_api.py       # Camera module interface
-│   └── powder_dispenser/
-│       ├── p_dispenser_api.py      # Arduino-based dispenser control (not in current use)
-│       └── p_dispenser_HAT_api.py  # Raspberry Pi + Motor HAT control (current setup)
-│
-├── logs/                       # Experiment logs
-│   └── experiments/
-│       ├── all/                # Full automated experiment results
-│       │   └── <timestamp>_<material>/   # One folder per run
-│       ├── single/             # Single Test Mode results saved individually
-│       │   └── <timestamp>_<material>_<stage>/
-│       └── old/                # Results from older software versions
-│
-├── operation/                  # Logic layer connecting UI actions to hardware
-│   ├── workflows.py            # Experiment flows called by each app mode
-│   ├── powder_flow_api.py      # Measurement implementations (calibration, densities, repose)
-│   ├── repose_analysis.py      # Angle-of-repose image analysis
-│   ├── powder_flow_io.py       # CSV serialisation utilities
-│   ├── step_timing_probe.py    # Step sensor timing diagnostic
-│   ├── cli.py                  # Command-line runner for experiments
-│   └── testing/                # Hardware verification scripts
-│
-├── output/                     # Cross-run summary CSVs (appended automatically on save)
-│   ├── flowability_data.csv    # One row added per saved Automated Evaluation:
-│   │                           #   bulk density, tapped density, Hausner Ratio, angle of repose
-│   └── calibration_data.csv    # One row added per saved calibration result:
-│                               #   optimal vibration condition, step mass mean / stdev
-│
-├── service/                    # Device-agnostic shared logic
-│   ├── result_store.py         # Core save logic (writes logs, updates DB, appends output CSVs)
-│   ├── result_writer.py        # Result → CSV conversion utilities
-│   ├── settings_store.py       # app_settings.json read/write and default values
-│   └── plot_service.py         # Plot generation (e.g. angle-of-repose analysis charts)
-│
-├── run_app.sh                  # Pulls latest code, activates venv, launches the app
-└── run_app_desktop.sh          # Sets DISPLAY and calls run_app.sh (use this on the device)
+```text
+powder-characterizer/
+|-- app/                         # Legacy PySide GUI
+|-- config/                      # Settings, disk data, calibration, and Material DB
+|-- deploy/                      # Raspberry Pi environment and systemd deployment
+|-- hardware_api/                # Legacy/local hardware interfaces
+|-- logs/                        # Saved experiment data
+|-- operation/                   # Device-independent algorithms and workflows
+|-- output/                      # Existing cross-run summary data
+|-- service/                     # Settings, result storage, and plotting services
+|-- sila2_servers/
+|   |-- powder_characterizer_server/             # Layer 2 process server
+|   |-- powder_characterizer_dispenser_server/   # Layer 1 dispenser server
+|   `-- powder_characterizer_camera_server/      # Layer 1 camera server
+|-- tests/                        # Automated software tests
+|-- web_ui_gateway/               # FastAPI gateway and browser UI
+|-- run_web.sh                    # Development Web UI launcher
+|-- run_app.sh                    # Legacy application launcher
+`-- requirements.txt
 ```
 
----
+The Balance Server is intentionally not duplicated in this repository. The
+existing `/home/sdl-5/balance_sila_server` checkout is started by the included
+systemd service and used as the Layer 1 Balance service.
 
 ## GitHub Integration
 
-The source code, configuration files, and experiment logs are all tracked in this Git repository:
-**https://github.com/oosaka005/powder-flow**
+Repository:
+`https://github.com/oosaka005/powder-characterizer`
 
-### Pushing code changes
-
-If you modify any code or configuration while connected to the Raspberry Pi via SSH, commit and push the changes before logging out:
+If code is changed directly on the Raspberry Pi, commit and push before ending
+the session:
 
 ```bash
 git add -A
@@ -293,53 +390,41 @@ git commit -m "Your name: brief description of the change"
 git push
 ```
 
-Include **who made the change** and **what was changed** in the commit message so the history remains readable.
-
-### Pulling the latest code onto the Raspberry Pi
-
-Automatic `git pull` on app startup has been disabled.
-If someone else has pushed updates to GitHub and you want to apply them on the Raspberry Pi, run the following manually before restarting the app:
+Automatic `git pull` at application startup is disabled. Apply remote updates
+manually before restarting services:
 
 ```bash
 cd ~/powder-flow
-git pull
+git pull --ff-only
 ```
 
-### What is tracked by Git
+The Raspberry Pi checkout may continue to use the directory name
+`~/powder-flow`. After the GitHub repository is renamed, update its remote URL
+once with:
 
-Not only source code but also configuration files and experiment data are committed to the repository:
+```bash
+git remote set-url origin https://github.com/oosaka005/powder-characterizer.git
+```
 
-| Path | Contents |
-|------|----------|
-| `config/` | Device settings, disk master, material database, calibration export |
-| `logs/` | Per-run experiment results (JSON, CSV, images) |
-| `output/` | Cross-run summary CSVs |
+Configuration and experiment data under `config/`, `logs/`, and `output/` are
+currently tracked by Git. Review generated data before using `git add -A`.
 
-When committing after an experiment, these files will be included automatically if you use `git add -A`.
+If `git pull` reports a merge conflict, do not guess at a resolution. Preserve
+the files and contact the person responsible for the codebase.
 
-### Conflicts
+## Operational Precautions
 
-If `git pull` reports a merge conflict, do not attempt to resolve it manually — contact the person responsible for the codebase.
-
----
-
-## Precautions
-
-- **Load powder and install the correct disk before starting.**
-  Verify the Disk ID in Setup Mode matches the physical disk in the device before pressing Start Automated Evaluation.
-
-- **Setup Mode settings auto-save immediately.**
-  Any change to material name, disk ID, or vibration settings is written to disk instantly. Double-check your settings before starting a run.
-
-- **Do not switch tabs or interact with Manual/Single Test Mode while a Run is in progress.**
-  The automated experiment runs in a background thread; unexpected interactions may interfere with the sequence.
-
-- **After Abort**, inspect the hardware before restarting.
-  The dispenser mechanism may have stopped mid-cycle. Clear any powder or blockage manually if needed.
-
-- **Run Calibration first for a new material or after changing the disk.**
-  The flowability calculations (bulk density, tapped density) depend on calibration data stored in the Material DB.
-  Without a valid calibration record, results may be unreliable.
-
-- **Save or Discard before leaving the Result screen.**
-  Closing the app without doing so will leave temporary files on disk and the Material DB will not be updated.
+- Do not operate physical hardware until wiring and hardware acceptance tests
+  are complete.
+- Load powder and install the correct disk before starting an experiment.
+- Confirm that the selected Disk ID matches the physical disk.
+- Only the Dispenser Server may own the Motor Bonnet during production use.
+- Do not run the legacy PySide GUI while the SiLA 2 device servers are active.
+- Use `AbortCurrentOperation` when an active workflow must be stopped, then
+  inspect the mechanism before restarting.
+- Run `RunCalibration` for a new material or after changing the disk before
+  relying on density calculations.
+- Review pending results and choose `SaveResults` or `DiscardResults` before
+  starting another measurement.
+- Treat direct Layer 1 commands as maintenance and acceptance-test operations;
+  confirm that the physical area is safe before moving any device.
