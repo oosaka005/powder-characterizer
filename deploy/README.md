@@ -24,16 +24,22 @@ weight read, not only the existence of the device link.
    `/home/sdl-5/balance_sila_server`. The included `balance-sila-server.service`
    starts that existing server on `127.0.0.1:50052`; no replacement Balance
    Server is created. Run the included idempotent configurator once so that the
-   server opens the stable device path instead of `/dev/ttyUSB0`:
+   server opens the stable device path instead of `/dev/ttyUSB0` and replaces
+   only its fixed two-second pre-read delay with the Formulation Cell watched
+   stability policy:
 
    ```bash
    python3 /home/sdl-5/powder-flow/deploy/configure_balance_server.py --check
    python3 /home/sdl-5/powder-flow/deploy/configure_balance_server.py
    ```
 
-   The configurator reports `Already configured` without changing the file if
-   the implementation already contains
-   `BalanceInterface(port="/dev/ttyUSB-balance")`. Do not launch the
+   The watched read samples immediately every 0.5 seconds. It accepts the newest
+   reading when the complete trailing 2-second window spans no more than 0.005 g.
+   If the balance does not settle within 15 seconds, it logs a warning and uses
+   the newest available reading, matching the Formulation Cell policy. The
+   configurator validates the known Balance source before changing either file
+   and reports `Already configured` on later runs. Restart
+   `balance-sila-server.service` after configuring. Do not launch the
    formulation-cell powder dispenser server for the same Motor Bonnet.
 3. Keep the Balance USB-to-serial adapter connected to the designated physical
    USB port. This deployment uses the same physical-port policy as the

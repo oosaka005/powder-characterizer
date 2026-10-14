@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased] - 2026-10-14
+
+### Changed
+- Replaced the Balance fixed two-second pre-read delay with the Formulation Cell watched stability policy: immediate 0.5-second sampling, a 2-second trailing window, 0.005 g maximum spread, and a 15-second timeout that returns the newest value with a warning.
+- Extended the Raspberry Pi Balance configurator to install the stability policy idempotently while preserving the existing SiLA command boundary, tare behaviour, evaluation sequence, calculations, result schema, and stable USB device path.
+
 ## [Unreleased] - 2026-04-14
 
 ### Added

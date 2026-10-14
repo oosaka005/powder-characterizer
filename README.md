@@ -217,19 +217,20 @@ Feature identifier used by this project: `Balance`
 
 The Balance Server is maintained in the separate
 `/home/sdl-5/balance_sila_server` repository. Powder Characterizer currently
-uses the following interface:
+uses the following deployed interface:
 
 | Type | SiLA 2 identifier | Purpose |
 |---|---|---|
 | Property | `Status` | Return the current Balance state. |
-| Command | `ReadWeight` | Read a stabilized weight. |
-| Command | `ReadWeightImmediate` | Read the current weight without the normal settling delay. |
+| Command | `ReadWeight` | Sample immediately every 0.5 s and return the newest value after the complete trailing 2 s window stays within 0.005 g; after 15 s, warn and return the newest value. |
 | Command | `Tare` | Tare the Balance. |
-| Command | `Close` | Close the Balance hardware connection; reserved for maintenance and server shutdown. |
 
-Normal process workflows do not call `Balance.Close`. They close only their
-SiLA client channel so that the shared Balance Server remains available for the
-next experiment.
+The watched read is installed idempotently by
+`deploy/configure_balance_server.py`. It replaces only the fixed two-second
+pre-read delay. Sampling starts immediately, and the rest of each measurement
+workflow remains unchanged. Normal process workflows close only their SiLA
+client channel so that the shared Balance Server remains available for the next
+experiment.
 
 ## Control Paths
 

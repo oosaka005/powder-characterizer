@@ -1,6 +1,8 @@
 import serial
 import time
 
+from operation.balance_stability import read_settled_weight
+
 DEFAULT_SERIAL_PORT = "/dev/ttyUSB-balance"
 DEFAULT_BAUD_RATE = 9600
 DEFAULT_TIMEOUT = 1.0
@@ -23,10 +25,8 @@ class Balance:
         )
         print(f"[balance] Connected to {serial_port}")
 
-    def read_weight(self, settle_time: float = 2.0):
-        """Read weight from balance after optional settling delay."""
-        if settle_time > 0:
-            time.sleep(settle_time)
+    def _read_weight_once(self) -> float:
+        """Read one weight immediately without applying a settling policy."""
         self.connection.write(b"R")
         accumulated = ""
 
@@ -41,6 +41,12 @@ class Balance:
             return float(accumulated.replace("\r", "").replace("\n", "").strip())
         except ValueError:
             raise RuntimeError(f"Failed to parse: {accumulated}")
+
+    def read_weight(self, settle_time: float = 2.0):
+        """Read once immediately or wait until a full stability window holds."""
+        if settle_time <= 0:
+            return self._read_weight_once()
+        return read_settled_weight(self._read_weight_once).mass_g
 
     def tare(self):
         """Execute tare command."""
