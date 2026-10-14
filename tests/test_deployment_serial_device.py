@@ -13,7 +13,7 @@ def test_balance_deployment_uses_one_stable_device_name() -> None:
     ).read_text()
     legacy_driver = (ROOT / "hardware_api/balance/balance_api.py").read_text()
 
-    assert 'KERNELS=="1-1"' in udev_rule
+    assert 'KERNELS=="3-1"' in udev_rule
     assert 'SYMLINK+="ttyUSB-balance"' in udev_rule
     assert 'ENV{SYSTEMD_ALIAS}+="/dev/sila2/balance"' in udev_rule
     assert "BindsTo=dev-sila2-balance.device" in service

@@ -6,4 +6,4 @@
 # Balance connected to this port. If the port changes, update KERNELS after
 # checking the USB-device KERNELS value reported by udevadm (for example 1-1,
 # without an interface suffix such as :1.0).
-SUBSYSTEM=="tty", KERNELS=="1-1", SYMLINK+="ttyUSB-balance", TAG+="systemd", ENV{SYSTEMD_ALIAS}+="/dev/sila2/balance", ENV{SYSTEMD_WANTS}+="balance-sila-server.service"
+SUBSYSTEM=="tty", KERNELS=="3-1", SYMLINK+="ttyUSB-balance", TAG+="systemd", ENV{SYSTEMD_ALIAS}+="/dev/sila2/balance", ENV{SYSTEMD_WANTS}+="balance-sila-server.service"

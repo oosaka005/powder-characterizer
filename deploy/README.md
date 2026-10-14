@@ -39,15 +39,15 @@ weight read, not only the existence of the device link.
 3. Keep the Balance USB-to-serial adapter connected to the designated physical
    USB port. This deployment uses the same physical-port policy as the
    Formulation Cell. On `dispensercontroller`, the observed by-path entry is
-   consistent with the direct USB port `KERNELS=="1-1"`. Confirm the exact udev
-   ancestry before installation:
+   confirmed as the direct USB port `KERNELS=="3-1"`. Confirm the udev ancestry
+   before installation:
 
    ```bash
    udevadm info -a -n /dev/ttyUSB0 | grep 'KERNELS=='
    ```
 
-   Use the USB-device entry without the interface suffix (for example `1-1`,
-   not `1-1:1.0`). If it differs from `1-1`, update `KERNELS` in
+   Use the USB-device entry without the interface suffix (for example `3-1`,
+   not `3-1:1.0`). If it differs from `3-1`, update `KERNELS` in
    `udev/99-powder-flow.rules`. The adapter cable may be replaced, but the
    physical Raspberry Pi USB port must remain the same.
 4. Copy `powder-flow.env.example` to `/etc/powder-flow.env` and adjust hosts or
