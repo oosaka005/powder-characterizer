@@ -9,8 +9,11 @@ from pathlib import Path
 DEFAULT_REPOSITORY = Path("/home/sdl-5/balance_sila_server")
 IMPLEMENTATION = Path("balance_server/feature_implementations/balance_impl.py")
 DRIVER = Path("balance_server/drivers/balance_interface.py")
+SERVER_MAIN = Path("balance_server/__main__.py")
 OLD = b'BalanceInterface(port="/dev/ttyUSB0")'
 NEW = b'BalanceInterface(port="/dev/ttyUSB-balance")'
+OLD_GRPC_STOP = b"server.grpc_server.stop()"
+NEW_GRPC_STOP = b"server.grpc_server.stop(grace=0)"
 
 STABILITY_CONSTANTS = b'''\
 BALANCE_STABLE_POLL_S = 0.5
@@ -129,24 +132,44 @@ def _configured_driver(source: bytes, path: Path) -> tuple[bytes, bool]:
     return configured, True
 
 
+def _configured_server_main(source: bytes, path: Path) -> tuple[bytes, bool]:
+    old_count = source.count(OLD_GRPC_STOP)
+    new_count = source.count(NEW_GRPC_STOP)
+    if old_count == 0 and new_count == 1:
+        return source, False
+    if old_count != 1 or new_count != 0:
+        raise RuntimeError(
+            "Expected exactly one gRPC shutdown call without a grace argument "
+            f"in {path}; found old={old_count}, new={new_count}. Inspect the "
+            "Balance server before editing it."
+        )
+    return source.replace(OLD_GRPC_STOP, NEW_GRPC_STOP, 1), True
+
+
 def configure(repository: Path, *, check_only: bool) -> str:
     implementation = repository / IMPLEMENTATION
     driver = repository / DRIVER
+    server_main = repository / SERVER_MAIN
     configured_implementation, implementation_changed = _configured_implementation(
         implementation.read_bytes(), implementation
     )
     configured_driver, driver_changed = _configured_driver(driver.read_bytes(), driver)
-    changed = implementation_changed or driver_changed
+    configured_server_main, server_main_changed = _configured_server_main(
+        server_main.read_bytes(), server_main
+    )
+    changed = implementation_changed or driver_changed or server_main_changed
     if not changed:
-        return f"Already configured: {implementation}; {driver}"
+        return f"Already configured: {implementation}; {driver}; {server_main}"
     if check_only:
-        return f"Ready to configure: {implementation}; {driver}"
+        return f"Ready to configure: {implementation}; {driver}; {server_main}"
 
     if implementation_changed:
         implementation.write_bytes(configured_implementation)
     if driver_changed:
         driver.write_bytes(configured_driver)
-    return f"Configured: {implementation}; {driver}"
+    if server_main_changed:
+        server_main.write_bytes(configured_server_main)
+    return f"Configured: {implementation}; {driver}; {server_main}"
 
 
 def main() -> None:
