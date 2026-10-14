@@ -1,19 +1,99 @@
 # Raspberry Pi deployment
 
+## Recommended Balance USB policy
+
+Powder-flow has one Balance and normally one USB-serial device, so it does not
+need the Formulation Cell's multi-device `servers.toml` and templated systemd
+units. It uses the same proven identification principle in a smaller form:
+
+- reserve one physical Raspberry Pi USB port for the Balance;
+- create the stable logical name `/dev/ttyUSB-balance` with udev;
+- make both production and legacy Balance code use that logical name; and
+- bind the existing Balance service to the udev device so unplugging stops the
+  service and reconnecting to the reserved port starts it again.
+
+The USB-to-serial cable is not part of the identity and may be replaced. A
+different USB-serial device connected to the reserved port would receive the
+same logical name, because a physical-port rule cannot identify the protocol.
+The final acceptance check must therefore include an actual Balance status and
+weight read, not only the existence of the device link.
+
 1. Use the existing repository at `/home/sdl-5/powder-flow` and its `.venv`.
    After pulling an update, install `requirements.txt` into that environment.
 2. Keep the existing Balance Server repository at
    `/home/sdl-5/balance_sila_server`. The included `balance-sila-server.service`
    starts that existing server on `127.0.0.1:50052`; no replacement Balance
-   Server is created. Do not launch the formulation-cell powder dispenser server
-   for the same Motor Bonnet.
-3. Copy `powder-flow.env.example` to `/etc/powder-flow.env` and adjust hosts or
+   Server is created. Apply the included compatibility patch once so that the
+   server opens the stable device path instead of `/dev/ttyUSB0`:
+
+   ```bash
+   cd /home/sdl-5/balance_sila_server
+   git apply --check /home/sdl-5/powder-flow/deploy/patches/balance-server-use-stable-device.patch
+   git apply /home/sdl-5/powder-flow/deploy/patches/balance-server-use-stable-device.patch
+   ```
+
+   The patch is already applied if the implementation contains
+   `BalanceInterface(port="/dev/ttyUSB-balance")`; do not apply it twice. Do not
+   launch the formulation-cell powder dispenser server for the same Motor
+   Bonnet.
+3. Keep the Balance USB-to-serial adapter connected to the designated physical
+   USB port. This deployment uses the same physical-port policy as the
+   Formulation Cell. On `dispensercontroller`, the observed by-path entry is
+   consistent with the direct USB port `KERNELS=="1-1"`. Confirm the exact udev
+   ancestry before installation:
+
+   ```bash
+   udevadm info -a -n /dev/ttyUSB0 | grep 'KERNELS=='
+   ```
+
+   Use the USB-device entry without the interface suffix (for example `1-1`,
+   not `1-1:1.0`). If it differs from `1-1`, update `KERNELS` in
+   `udev/99-powder-flow.rules`. The adapter cable may be replaced, but the
+   physical Raspberry Pi USB port must remain the same.
+4. Copy `powder-flow.env.example` to `/etc/powder-flow.env` and adjust hosts or
    ports if required. Do not put I2C addresses in this file.
-4. Copy the units in `systemd/` to `/etc/systemd/system/`, then enable
-   `powder-flow.target`. Enable `powder-flow-kiosk.service` only on an RPi with a
-   local display and Chromium installed.
-5. Confirm the first-layer server states, then open
+5. Install the systemd units and udev rule, then reload both managers. The final
+   `readlink` command must resolve to the Balance adapter:
+
+   ```bash
+   cd /home/sdl-5/powder-flow/deploy
+   sudo systemctl stop balance-sila-server.service
+   sudo install -m 0644 systemd/*.service systemd/*.target /etc/systemd/system/
+   sudo install -m 0644 udev/99-powder-flow.rules /etc/udev/rules.d/99-powder-flow.rules
+   sudo systemctl daemon-reload
+   sudo udevadm control --reload-rules
+   sudo systemctl reset-failed balance-sila-server.service
+   sudo udevadm trigger --action=add --subsystem-match=tty
+   sudo systemctl enable --now powder-flow.target
+   readlink -f /dev/ttyUSB-balance
+   ```
+
+   Enable `powder-flow-kiosk.service` only on an RPi with a local display and
+   Chromium installed.
+6. Confirm the first-layer server states, then open
    `http://dispensercontroller.local:8000` from a laptop.
+
+The Balance service is bound to the fixed udev device. Removing the Balance
+cable stops the service; reconnecting it to the designated port starts the
+service again. Verify both the mapping and an actual Balance read after
+installation:
+
+```bash
+readlink -f /dev/ttyUSB-balance
+systemctl status balance-sila-server.service --no-pager -l
+journalctl -u balance-sila-server.service -n 50 --no-pager
+cd /home/sdl-5/powder-flow
+.venv/bin/python - <<'PY'
+from sila2.client import SilaClient
+
+client = SilaClient("127.0.0.1", 50052, insecure=True)
+try:
+    print("status:", client.Balance.Status.get())
+    print("weight:", client.Balance.ReadWeight().Weight)
+finally:
+    client.close()
+PY
+```
 
 The service account needs access to I2C, GPIO, camera, and the existing
 configuration/log/output paths. Only the dispenser server process may own the

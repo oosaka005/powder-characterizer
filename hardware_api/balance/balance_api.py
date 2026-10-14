@@ -1,10 +1,7 @@
 import serial
 import time
 
-DEFAULT_SERIAL_PORT = (
-    "/dev/serial/by-id/"
-    "usb-Prolific_Technology_Inc._USB-Serial_Controller_BPCNb147613-if00-port0"
-)
+DEFAULT_SERIAL_PORT = "/dev/ttyUSB-balance"
 DEFAULT_BAUD_RATE = 9600
 DEFAULT_TIMEOUT = 1.0
 

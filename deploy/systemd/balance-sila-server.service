@@ -1,6 +1,10 @@
 [Unit]
 Description=Existing Balance SiLA2 Server
-After=network.target
+# The udev rule aliases the Balance USB device as dev-sila2-balance.device.
+# Binding the service to that device stops it when the cable is removed and
+# allows udev to start it again when the Balance is reconnected.
+BindsTo=dev-sila2-balance.device
+After=dev-sila2-balance.device network.target
 
 [Service]
 Type=simple

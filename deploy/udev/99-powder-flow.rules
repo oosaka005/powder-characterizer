@@ -1,0 +1,9 @@
+# Powder-flow USB device rules. Install this file as
+# /etc/udev/rules.d/99-powder-flow.rules.
+#
+# The Balance USB-to-serial adapter is identified by its physical Raspberry Pi
+# USB port, matching the operating rule used by the Formulation Cell. Keep the
+# Balance connected to this port. If the port changes, update KERNELS after
+# checking the USB-device KERNELS value reported by udevadm (for example 1-1,
+# without an interface suffix such as :1.0).
+SUBSYSTEM=="tty", KERNELS=="1-1", SYMLINK+="ttyUSB-balance", TAG+="systemd", ENV{SYSTEMD_ALIAS}+="/dev/sila2/balance", ENV{SYSTEMD_WANTS}+="balance-sila-server.service"
