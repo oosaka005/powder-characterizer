@@ -36,7 +36,7 @@ def test_balance_server_configurator_is_idempotent(tmp_path: Path) -> None:
     driver = tmp_path / DRIVER
     driver.parent.mkdir(parents=True)
     driver.write_bytes(
-        b'import time\n\nDEFAULT_TIMEOUT = 1.0\n\n\nclass BalanceInterface:\n'
+        b'import time\n\nimport serial\n\n\nclass BalanceInterface:\n'
         + OLD_DRIVER_READ
         + b'\n    def tare(self) -> None:\n        pass\n'
     )
@@ -73,7 +73,7 @@ def test_configured_balance_driver_uses_the_stability_window(tmp_path: Path) -> 
     driver = tmp_path / DRIVER
     driver.parent.mkdir(parents=True)
     driver.write_bytes(
-        b'import time\n\nDEFAULT_TIMEOUT = 1.0\n\n\nclass BalanceInterface:\n'
+        b'import time\n\nimport serial\n\n\nclass BalanceInterface:\n'
         + OLD_DRIVER_READ
         + b'\n    def tare(self) -> None:\n        pass\n'
     )
@@ -121,7 +121,7 @@ def test_configured_balance_driver_preserves_immediate_read_compatibility(
     driver = tmp_path / DRIVER
     driver.parent.mkdir(parents=True)
     driver.write_bytes(
-        b'import time\n\nDEFAULT_TIMEOUT = 1.0\n\n\nclass BalanceInterface:\n'
+        b'import time\n\nimport serial\n\n\nclass BalanceInterface:\n'
         + OLD_DRIVER_READ
         + b'\n    def tare(self) -> None:\n        pass\n'
     )

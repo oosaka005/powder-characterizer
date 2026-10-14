@@ -113,17 +113,17 @@ def _configured_driver(source: bytes, path: Path) -> tuple[bytes, bool]:
             "Inspect the Balance server before editing it."
         )
     old_count = source.count(OLD_DRIVER_READ)
-    timeout_marker = b"DEFAULT_TIMEOUT = 1.0\n"
-    if old_count != 1 or source.count(timeout_marker) != 1:
+    import_marker = b"import serial\n"
+    if old_count != 1 or source.count(import_marker) != 1:
         raise RuntimeError(
             "Expected the verified legacy read_weight implementation and one "
-            f"DEFAULT_TIMEOUT marker in {path}; found read_weight={old_count}, "
-            f"timeout_marker={source.count(timeout_marker)}. Inspect the Balance "
+            f"serial import in {path}; found read_weight={old_count}, "
+            f"serial_import={source.count(import_marker)}. Inspect the Balance "
             "server before editing it."
         )
     configured = source.replace(
-        timeout_marker,
-        timeout_marker + b"\n" + STABILITY_CONSTANTS,
+        import_marker,
+        import_marker + b"\n" + STABILITY_CONSTANTS,
         1,
     ).replace(OLD_DRIVER_READ, STABLE_DRIVER_READ, 1)
     return configured, True
