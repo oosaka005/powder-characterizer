@@ -1,7 +1,0 @@
-diff --git a/balance_server/feature_implementations/balance_impl.py b/balance_server/feature_implementations/balance_impl.py
---- a/balance_server/feature_implementations/balance_impl.py
-+++ b/balance_server/feature_implementations/balance_impl.py
-@@ -17,2 +17,2 @@
-         super().__init__(parent_server=parent_server)
--        self._driver = BalanceInterface(port="/dev/ttyUSB0")
-+        self._driver = BalanceInterface(port="/dev/ttyUSB-balance")

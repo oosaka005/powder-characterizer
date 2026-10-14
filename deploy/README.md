@@ -23,19 +23,18 @@ weight read, not only the existence of the device link.
 2. Keep the existing Balance Server repository at
    `/home/sdl-5/balance_sila_server`. The included `balance-sila-server.service`
    starts that existing server on `127.0.0.1:50052`; no replacement Balance
-   Server is created. Apply the included compatibility patch once so that the
+   Server is created. Run the included idempotent configurator once so that the
    server opens the stable device path instead of `/dev/ttyUSB0`:
 
    ```bash
-   cd /home/sdl-5/balance_sila_server
-   git apply --check /home/sdl-5/powder-flow/deploy/patches/balance-server-use-stable-device.patch
-   git apply /home/sdl-5/powder-flow/deploy/patches/balance-server-use-stable-device.patch
+   python3 /home/sdl-5/powder-flow/deploy/configure_balance_server.py --check
+   python3 /home/sdl-5/powder-flow/deploy/configure_balance_server.py
    ```
 
-   The patch is already applied if the implementation contains
-   `BalanceInterface(port="/dev/ttyUSB-balance")`; do not apply it twice. Do not
-   launch the formulation-cell powder dispenser server for the same Motor
-   Bonnet.
+   The configurator reports `Already configured` without changing the file if
+   the implementation already contains
+   `BalanceInterface(port="/dev/ttyUSB-balance")`. Do not launch the
+   formulation-cell powder dispenser server for the same Motor Bonnet.
 3. Keep the Balance USB-to-serial adapter connected to the designated physical
    USB port. This deployment uses the same physical-port policy as the
    Formulation Cell. On `dispensercontroller`, the observed by-path entry is
