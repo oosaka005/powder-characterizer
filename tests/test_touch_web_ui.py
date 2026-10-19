@@ -67,6 +67,15 @@ class TouchWebUiTests(unittest.TestCase):
         self.assertEqual(self.html.count('data-field="volume_ml"'), 3)
         self.assertIn("/api/results/manual-bulk-density", self.javascript)
 
+    def test_single_tests_show_confirmation_and_operation_mode(self) -> None:
+        self.assertIn("confirmSingleTest", self.javascript)
+        self.assertIn("Has the material priming been completed?", self.javascript)
+        self.assertIn("Has the powder pile been formed?", self.javascript)
+        self.assertEqual(self.html.count('class="mode-indicator automated"'), 3)
+        self.assertEqual(self.html.count('class="mode-indicator manual"'), 1)
+        self.assertNotIn("Enter an n=3 manual measurement", self.html)
+        self.assertNotIn("Optimize vibration conditions", self.html)
+
     def test_material_database_uses_sorted_table(self) -> None:
         self.assertIn('id="material-table-wrap"', self.html)
         self.assertIn('class="material-table"', self.javascript)

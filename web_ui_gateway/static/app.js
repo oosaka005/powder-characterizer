@@ -165,8 +165,9 @@ function setToggle(id, enabled) { $(id).setAttribute('aria-checked', enabled ? '
 function getToggle(id) { return $(id).getAttribute('aria-checked') === 'true'; }
 ['manual_aug','update-db'].forEach(id => $(id).addEventListener('click', () => setToggle(id, !getToggle(id))));
 
-function confirmAction(title, message, confirmLabel='Continue') {
+function confirmAction(title, message, confirmLabel='Continue', tone='danger') {
   $('confirm-title').textContent=title; $('confirm-message').textContent=message; $('confirm-ok').textContent=confirmLabel;
+  $('confirm-ok').className=tone==='primary'?'primary':'danger';
   $('confirm-dialog').returnValue='';
   $('confirm-dialog').showModal();
   return new Promise(resolve => { confirmResolver=resolve; });
@@ -297,10 +298,28 @@ $('save-bulk-density').addEventListener('click',async()=>{
   }catch(error){toast(error.message,true);}
 });
 
-document.querySelectorAll('.single').forEach(button=>button.addEventListener('click',()=>{
-  if(button.dataset.stage==='bulk_density'){openBulkDensityEntry();return;}
-  api('/api/runs/single/'+button.dataset.stage,{method:'POST'}).then(()=>{showPage('auto');showAutoView('run');}).catch(error=>toast(error.message,true));
-}));
+const singleTestConfirmations={
+  calibration:{label:'Calibration',question:'Has the material priming been completed?'},
+  bulk_density:{label:'Bulk Density',question:'Open the n=3 manual measurement entry for these conditions?'},
+  tapped_density:{label:'Tapped Density',question:'Has the material priming been completed?'},
+  angle_of_repose:{label:'Angle of Repose',question:'Has the powder pile been formed?'}
+};
+
+async function confirmSingleTest(stage){
+  const confirmation=singleTestConfirmations[stage];
+  if(!confirmation)return;
+  const material=settings?.material?.material_name||'Not selected';
+  const disk=settings?.material?.disk_id||'Not selected';
+  const approved=await confirmAction(`Confirm — ${confirmation.label}`,`Material: ${material}\nDisk ID: ${disk}\n\n${confirmation.question}`,stage==='bulk_density'?'Continue':'Yes, Start','primary');
+  if(!approved)return;
+  if(stage==='bulk_density'){openBulkDensityEntry();return;}
+  try{
+    await api('/api/runs/single/'+stage,{method:'POST'});
+    showPage('auto');showAutoView('run');
+  }catch(error){toast(error.message,true);}
+}
+
+document.querySelectorAll('.single').forEach(button=>button.addEventListener('click',()=>confirmSingleTest(button.dataset.stage)));
 $('single-dispense').addEventListener('click',()=>manualRun(1).catch(error=>toast(error.message,true)));
 $('single-capture').addEventListener('click',()=>preview('/api/camera/repose-preview').then(()=>showPage('manual')).catch(error=>toast(error.message,true)));
 
