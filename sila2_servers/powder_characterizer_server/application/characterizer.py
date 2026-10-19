@@ -10,6 +10,7 @@ import threading
 import time
 from types import SimpleNamespace
 from typing import Any, Callable
+from uuid import uuid4
 
 from operation.workflows import (
     CancellationToken,
@@ -87,6 +88,7 @@ class PowderCharacterizerApplication:
         self._pending_result: dict[str, Any] | None = None
         self._pending_kind: str | None = None
         self._pending_artifacts: dict[str, dict[str, Any]] = {}
+        self._repose_previews: dict[str, tuple[float, bytes]] = {}
 
     def snapshot(self) -> dict[str, Any]:
         with self._state_lock:
@@ -255,19 +257,47 @@ class PowderCharacterizerApplication:
         stage: str,
         callback: ProgressCallback | None = None,
     ) -> dict[str, Any]:
-        operation = stage.strip().lower()
+        requested_stage = stage.strip().lower()
+        preview_id: str | None = None
+        if requested_stage.startswith("angle_of_repose_prepared:"):
+            requested_stage, preview_id = "angle_of_repose", requested_stage.split(":", 1)[1]
+            if not preview_id:
+                raise ValueError("A prepared angle-of-repose image ID is required.")
+        operation = requested_stage
         self._begin(operation, callback)
         devices = None
+        camera = None
         try:
-            devices = self._device_factory.create()
-            self._active_devices = devices
+            prepared_repose_image: bytes | None = None
+            if preview_id is not None:
+                now = time.monotonic()
+                with self._state_lock:
+                    self._repose_previews = {
+                        key: value
+                        for key, value in self._repose_previews.items()
+                        if now - value[0] <= 600.0
+                    }
+                    preview = self._repose_previews.pop(preview_id, None)
+                if preview is None:
+                    raise ValueError("The confirmation image has expired. Capture it again.")
+                prepared_repose_image = preview[1]
+
+            if operation == "angle_of_repose":
+                if prepared_repose_image is None:
+                    camera = self._device_factory.create_camera()
+                self._active_devices = SimpleNamespace(camera=camera)
+            else:
+                devices = self._device_factory.create()
+                self._active_devices = devices
+
             result = run_single_test(
-                stage=stage,
+                stage=operation,
                 hooks=FlowHooks(on_log=lambda msg: self._on_log(msg, callback)),
                 cancel_token=self._cancel_token,
-                powder_dispenser=devices.powder_dispenser,
-                balance=devices.balance,
-                camera=devices.camera,
+                powder_dispenser=devices.powder_dispenser if devices is not None else None,
+                balance=devices.balance if devices is not None else None,
+                camera=camera,
+                prepared_repose_image=prepared_repose_image,
             )
             self._raise_if_cancelled()
             return self._finish(result, operation, callback, "single")
@@ -277,6 +307,8 @@ class PowderCharacterizerApplication:
         finally:
             if devices is not None:
                 devices.close()
+            if camera is not None:
+                camera.close()
             self._end()
 
     def run_manual(
@@ -357,7 +389,25 @@ class PowderCharacterizerApplication:
         camera = None
         try:
             camera = self._device_factory.create_camera()
-            return run_capture_repose_preview(camera=camera)
+            result = run_capture_repose_preview(camera=camera)
+            source_image = bytes(result.pop("source_image_bytes"))
+            preview_id = uuid4().hex
+            now = time.monotonic()
+            with self._state_lock:
+                self._repose_previews = {
+                    key: value
+                    for key, value in self._repose_previews.items()
+                    if now - value[0] <= 600.0
+                }
+                self._repose_previews[preview_id] = (now, source_image)
+                while len(self._repose_previews) > 8:
+                    oldest_id = min(
+                        self._repose_previews,
+                        key=lambda key: self._repose_previews[key][0],
+                    )
+                    del self._repose_previews[oldest_id]
+            result["preview_id"] = preview_id
+            return result
         finally:
             if camera is not None:
                 camera.close()
@@ -369,7 +419,9 @@ class PowderCharacterizerApplication:
                 self._cancel_token.cancel()
             active = self._active_devices
         if active is not None:
-            active.powder_dispenser.stop_all()
+            dispenser = getattr(active, "powder_dispenser", None)
+            if dispenser is not None:
+                dispenser.stop_all()
 
     def save_pending(self, *, update_material_database: bool = False) -> None:
         with self._state_lock:

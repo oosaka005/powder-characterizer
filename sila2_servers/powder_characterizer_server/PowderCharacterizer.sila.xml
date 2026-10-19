@@ -52,7 +52,7 @@
   <Command>
     <Identifier>RunSingleTest</Identifier><DisplayName>Run Single Test</DisplayName>
     <Description>Run a named existing single-test stage.</Description><Observable>Yes</Observable>
-    <Parameter><Identifier>Stage</Identifier><DisplayName>Stage</DisplayName><Description>calibration, bulk_density, tapped_density, or angle_of_repose.</Description><DataType><Basic>String</Basic></DataType></Parameter>
+    <Parameter><Identifier>Stage</Identifier><DisplayName>Stage</DisplayName><Description>calibration, bulk_density, tapped_density, angle_of_repose, or an internal prepared angle-of-repose image reference.</Description><DataType><Basic>String</Basic></DataType></Parameter>
     <Response><Identifier>ResultJson</Identifier><DisplayName>Result JSON</DisplayName><Description>Final result and artifact metadata.</Description><DataType><Basic>String</Basic></DataType></Response>
     <IntermediateResponse><Identifier>UpdateJson</Identifier><DisplayName>Update JSON</DisplayName><Description>Current execution snapshot.</Description><DataType><Basic>String</Basic></DataType></IntermediateResponse>
   </Command>
@@ -89,7 +89,7 @@
     <Description>Capture and crop the existing repose preview.</Description><Observable>No</Observable>
     <Response><Identifier>ImageData</Identifier><DisplayName>Image Data</DisplayName><Description>PNG bytes.</Description><DataType><Basic>Binary</Basic></DataType></Response>
     <Response><Identifier>MediaType</Identifier><DisplayName>Media Type</DisplayName><Description>HTTP media type.</Description><DataType><Basic>String</Basic></DataType></Response>
-    <Response><Identifier>Filename</Identifier><DisplayName>Filename</DisplayName><Description>Filename.</Description><DataType><Basic>String</Basic></DataType></Response>
+    <Response><Identifier>Filename</Identifier><DisplayName>Preview ID</DisplayName><Description>Temporary image identifier used to analyze this exact capture.</Description><DataType><Basic>String</Basic></DataType></Response>
   </Command>
 
   <Command>

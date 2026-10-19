@@ -84,7 +84,7 @@ class PowderCharacterizerImpl(PowderCharacterizerBase):
         return CaptureReposePreview_Responses(
             ImageData=result["image_bytes"],
             MediaType="image/png",
-            Filename=result["filename"],
+            Filename=result["preview_id"],
         )
 
     def AbortCurrentOperation(self, *, metadata: MetadataDict) -> AbortCurrentOperation_Responses:

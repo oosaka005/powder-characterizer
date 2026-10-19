@@ -46,8 +46,13 @@ class PowderCharacterizerClient:
     def run_automated(self) -> dict[str, str]:
         return self._execution(self._feature.RunAutomatedExperiment())
 
-    def run_single(self, stage: str) -> dict[str, str]:
-        return self._execution(self._feature.RunSingleTest(Stage=stage))
+    def run_single(self, stage: str, preview_id: str | None = None) -> dict[str, str]:
+        stage_reference = (
+            f"angle_of_repose_prepared:{preview_id}"
+            if stage == "angle_of_repose" and preview_id
+            else stage
+        )
+        return self._execution(self._feature.RunSingleTest(Stage=stage_reference))
 
     def run_manual(
         self,

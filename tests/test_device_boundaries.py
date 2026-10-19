@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from operation.fakes import FakeBalance, FakePowderDispenser
 from operation.powder_flow_api import measure_series
-from operation.workflows import run_manual_experiment
+from operation.workflows import _run_repose, run_manual_experiment, run_single_test
 from sila2_servers.powder_characterizer_dispenser_server.drivers.powder_dispenser import (
     AmbiguousDeviceError,
     DeviceNotConnectedError,
@@ -191,3 +193,107 @@ def test_second_layer_manual_operation_uses_injected_first_layer_adapter() -> No
         ("stop_all",),
         ("close",),
     ]
+
+
+def test_prepared_repose_workflow_does_not_create_other_devices() -> None:
+    repose_result = {
+        "angle_of_repose": {"angle_deg": 32.0, "class": "Good", "success": True},
+        "artifacts": {},
+    }
+    with (
+        patch("operation.local_devices.create_local_dispenser") as create_dispenser,
+        patch("operation.local_devices.create_local_balance") as create_balance,
+        patch("operation.local_devices.create_local_camera") as create_camera,
+        patch("operation.workflows._run_repose", return_value=repose_result) as run_repose,
+    ):
+        result = run_single_test(
+            stage="angle_of_repose",
+            prepared_repose_image=b"confirmed-image",
+        )
+
+    create_dispenser.assert_not_called()
+    create_balance.assert_not_called()
+    create_camera.assert_not_called()
+    assert run_repose.call_args.kwargs["camera"] is None
+    assert run_repose.call_args.kwargs["prepared_image_bytes"] == b"confirmed-image"
+    assert result["metadata"]["stage"] == "angle_of_repose"
+
+
+def test_prepared_repose_application_uses_preview_without_device_bundle() -> None:
+    class Camera:
+        def close(self) -> None:
+            return None
+
+    class Factory:
+        def __init__(self) -> None:
+            self.camera_calls = 0
+            self.bundle_calls = 0
+
+        def create_camera(self):
+            self.camera_calls += 1
+            return Camera()
+
+        def create(self):
+            self.bundle_calls += 1
+            raise AssertionError("Prepared repose must not create a full device bundle")
+
+    factory = Factory()
+    application = PowderCharacterizerApplication(device_factory=factory)  # type: ignore[arg-type]
+    preview_result = {
+        "action": "camera_preview",
+        "filename": "preview.png",
+        "image_bytes": b"display-image",
+        "source_image_bytes": b"source-image",
+    }
+    completed_result = {
+        "metadata": {
+            "material_name": "Sample",
+            "disk_id": "D06",
+            "timestamp": "20261019_120000",
+            "stage": "angle_of_repose",
+            "success": True,
+        },
+        "result_data": {
+            "angle_of_repose": {"angle_deg": 32.0, "class": "Good", "success": True}
+        },
+        "artifacts": {},
+    }
+
+    with patch(
+        "sila2_servers.powder_characterizer_server.application.characterizer.run_capture_repose_preview",
+        return_value=preview_result,
+    ):
+        preview = application.capture_repose_preview()
+
+    with patch(
+        "sila2_servers.powder_characterizer_server.application.characterizer.run_single_test",
+        return_value=completed_result,
+    ) as workflow:
+        application.run_single(f"angle_of_repose_prepared:{preview['preview_id']}")
+
+    assert factory.camera_calls == 1
+    assert factory.bundle_calls == 0
+    assert workflow.call_args.kwargs["prepared_repose_image"] == b"source-image"
+    assert workflow.call_args.kwargs["powder_dispenser"] is None
+    assert workflow.call_args.kwargs["balance"] is None
+    assert workflow.call_args.kwargs["camera"] is None
+
+
+def test_prepared_repose_analyzes_and_saves_the_confirmed_image() -> None:
+    confirmed_image = b"the exact confirmed image"
+    with patch(
+        "operation.repose_analysis.analyze_repose",
+        return_value=({}, 32.0),
+    ) as analyze:
+        result = _run_repose(
+            camera=None,
+            prepared_image_bytes=confirmed_image,
+            material_name="Sample",
+            timestamp="20261019_120000",
+            date_prefix="20261019_",
+        )
+
+    analyzed_path = analyze.call_args.args[0]
+    assert analyzed_path.name == "20261019_raw_image.png"
+    assert result["artifacts"]["repose_raw_image"]["data"] == confirmed_image
+    assert result["angle_of_repose"]["angle_deg"] == 32.0

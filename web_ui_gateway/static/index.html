@@ -181,6 +181,16 @@
   <dialog id="numeric-dialog" class="touch-dialog"><form method="dialog"><h2 id="numeric-title">Enter a Number</h2><output id="numeric-display">0</output><div id="numeric-keypad" class="numeric-keypad"></div><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="numeric-ok" value="default" class="primary">Apply</button></div></form></dialog>
   <dialog id="text-dialog" class="touch-dialog text-dialog"><form method="dialog"><h2>New Material Name</h2><output id="text-display"></output><div id="text-keyboard" class="text-keyboard"></div><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="text-ok" value="default" class="primary">Apply</button></div></form></dialog>
   <dialog id="confirm-dialog" class="touch-dialog confirm-dialog"><form method="dialog"><h2 id="confirm-title">Confirmation</h2><p id="confirm-message"></p><div class="dialog-actions"><button value="cancel" class="secondary">Back</button><button id="confirm-ok" value="default" class="danger">Continue</button></div></form></dialog>
+  <dialog id="repose-confirm-dialog" class="touch-dialog repose-confirm-dialog">
+    <form method="dialog">
+      <h2>Confirm — Angle of Repose</h2>
+      <p id="repose-confirm-context" class="dialog-context"></p>
+      <div id="repose-preview-status" class="preview-status">Capturing the current image…</div>
+      <img id="repose-confirm-image" alt="Current powder pile">
+      <p>Confirm the material, Disk ID, and powder pile before analysis.</p>
+      <div class="repose-dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="retake-repose-image" type="button" class="secondary">Retake Image</button><button id="analyze-repose-image" type="button" class="primary">Analyze Image</button></div>
+    </form>
+  </dialog>
   <dialog id="bulk-density-dialog" class="touch-dialog bulk-density-dialog">
     <form method="dialog">
       <h2>Manual Bulk Density</h2>

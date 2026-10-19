@@ -151,11 +151,13 @@ def run_automated(request: Request) -> dict[str, str]:
 
 
 @app.post("/api/runs/single/{stage}", status_code=202)
-def run_single(stage: str, request: Request) -> dict[str, str]:
+def run_single(stage: str, request: Request, preview_id: str | None = None) -> dict[str, str]:
     allowed = {"calibration", "bulk_density", "tapped_density", "angle_of_repose"}
     if stage not in allowed:
         raise HTTPException(status_code=400, detail="Unknown single-test stage.")
-    return _run(lambda: _client(request).run_single(stage))
+    if preview_id is not None and stage != "angle_of_repose":
+        raise HTTPException(status_code=400, detail="A confirmation image is only valid for angle of repose.")
+    return _run(lambda: _client(request).run_single(stage, preview_id))
 
 
 @app.post("/api/runs/manual", status_code=202)
@@ -230,11 +232,14 @@ def camera_preview(payload: PreviewRequest, request: Request) -> Response:
 
 @app.post("/api/camera/repose-preview")
 def repose_preview(request: Request) -> Response:
-    data, media_type, filename = _run(lambda: _client(request).repose_preview())
+    data, media_type, preview_id = _run(lambda: _client(request).repose_preview())
     return Response(
         data,
         media_type=media_type,
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={
+            "Content-Disposition": 'inline; filename="repose-preview.png"',
+            "X-Repose-Preview-Id": preview_id,
+        },
     )
 
 

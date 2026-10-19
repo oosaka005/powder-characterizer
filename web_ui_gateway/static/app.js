@@ -3,6 +3,8 @@
 let settings = null;
 let latestState = null;
 let previewUrl = null;
+let reposeConfirmationUrl = null;
+let reposeConfirmationId = null;
 let materialRows = [];
 let historyRecords = [];
 let historyLoaded = false;
@@ -302,12 +304,49 @@ const singleTestConfirmations={
   calibration:{label:'Calibration',question:'Has the material priming been completed?'},
   bulk_density:{label:'Bulk Density',question:'Open the n=3 manual measurement entry for these conditions?'},
   tapped_density:{label:'Tapped Density',question:'Has the material priming been completed?'},
-  angle_of_repose:{label:'Angle of Repose',question:'Has the powder pile been formed?'}
+  angle_of_repose:{label:'Angle of Repose'}
 };
+
+async function captureReposeConfirmationImage(){
+  const status=$('repose-preview-status'),image=$('repose-confirm-image'),retake=$('retake-repose-image'),analyze=$('analyze-repose-image');
+  reposeConfirmationId=null;retake.disabled=true;analyze.disabled=true;image.style.display='none';status.style.display='grid';status.textContent='Capturing the current image…';
+  const response=await fetch('/api/camera/repose-preview',{method:'POST',headers:{'Content-Type':'application/json'}});
+  if(!response.ok){
+    let message=response.statusText;
+    try{message=(await response.json()).detail||message;}catch(_){}
+    throw new Error(message);
+  }
+  const previewId=response.headers.get('X-Repose-Preview-Id');
+  if(!previewId)throw new Error('The camera did not return a confirmation image ID.');
+  const blob=await response.blob();
+  if(reposeConfirmationUrl)URL.revokeObjectURL(reposeConfirmationUrl);
+  reposeConfirmationUrl=URL.createObjectURL(blob);reposeConfirmationId=previewId;
+  image.src=reposeConfirmationUrl;image.style.display='block';status.style.display='none';retake.disabled=false;analyze.disabled=false;
+}
+
+async function openReposeConfirmation(){
+  if(!settings){toast('Settings are not available.',true);return;}
+  $('repose-confirm-context').textContent=`Material: ${settings.material.material_name}\nDisk ID: ${settings.material.disk_id}`;
+  $('repose-confirm-dialog').showModal();
+  try{await captureReposeConfirmationImage();}
+  catch(error){$('repose-preview-status').textContent=error.message;$('retake-repose-image').disabled=false;toast(error.message,true);}
+}
+
+$('retake-repose-image').addEventListener('click',()=>captureReposeConfirmationImage().catch(error=>{$('repose-preview-status').style.display='grid';$('repose-preview-status').textContent=error.message;$('retake-repose-image').disabled=false;toast(error.message,true);}));
+$('analyze-repose-image').addEventListener('click',async()=>{
+  if(!reposeConfirmationId)return;
+  const previewId=reposeConfirmationId;
+  $('analyze-repose-image').disabled=true;
+  try{
+    await api(`/api/runs/single/angle_of_repose?preview_id=${encodeURIComponent(previewId)}`,{method:'POST'});
+    $('repose-confirm-dialog').close('default');showPage('auto');showAutoView('run');
+  }catch(error){$('analyze-repose-image').disabled=false;toast(error.message,true);}
+});
 
 async function confirmSingleTest(stage){
   const confirmation=singleTestConfirmations[stage];
   if(!confirmation)return;
+  if(stage==='angle_of_repose'){await openReposeConfirmation();return;}
   const material=settings?.material?.material_name||'Not selected';
   const disk=settings?.material?.disk_id||'Not selected';
   const approved=await confirmAction(`Confirm — ${confirmation.label}`,`Material: ${material}\nDisk ID: ${disk}\n\n${confirmation.question}`,stage==='bulk_density'?'Continue':'Yes, Start','primary');

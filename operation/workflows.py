@@ -283,6 +283,8 @@ def run_capture_repose_preview(
         camera_device.capture_powder_image(output_path=tmp_path)
         _ensure_not_cancelled(cancel_token)
 
+        source_image_bytes = tmp_path.read_bytes()
+
         arr = cv2.imread(str(tmp_path), cv2.IMREAD_UNCHANGED)
         if arr is None:
             raise RuntimeError("Failed to load captured image.")
@@ -295,6 +297,7 @@ def run_capture_repose_preview(
             "action": "camera_preview",
             "filename": tmp_path.name,
             "image_bytes": image_bytes,
+            "source_image_bytes": source_image_bytes,
         }
     except FlowAbortedError:
         raise
@@ -465,6 +468,7 @@ def run_single_test(
     powder_dispenser: PowderDispenserInterface | None = None,
     balance: BalanceInterface | None = None,
     camera: CameraInterface | None = None,
+    prepared_repose_image: bytes | None = None,
 ) -> dict[str, Any]:
     from operation.local_devices import (
         create_local_balance,
@@ -484,28 +488,36 @@ def run_single_test(
     steps_per_level = int(calibration["steps_per_level"])
     stability_steps = int(calibration["stability_steps"])
 
-    if not vib_levels:
-        raise ValueError("vib_levels must contain at least one value.")
-    if not vib_time_candidates:
-        raise ValueError("vib_time_candidates must contain at least one value.")
-
     stage_key = stage.strip().lower()
     if stage_key == "repose":
         stage_key = "angle_of_repose"
+    if stage_key == "calibration":
+        if not vib_levels:
+            raise ValueError("vib_levels must contain at least one value.")
+        if not vib_time_candidates:
+            raise ValueError("vib_time_candidates must contain at least one value.")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     date_prefix = f"{timestamp[:8]}_"
     artifacts: dict[str, Any] = {}
-    owns_dispenser = powder_dispenser is None
-    dispenser = powder_dispenser or create_local_dispenser()
+    dispenser = powder_dispenser
     balance_device: BalanceInterface | None = balance
-    camera_device = camera or create_local_camera()
+    camera_device = camera
+    owns_dispenser = False
+    owns_camera = False
 
     _ensure_not_cancelled(cancel_token)
     _log_stage(hooks, f"Starting single test: {stage_key}")
 
     try:
         if stage_key in {"calibration", "bulk_density", "tapped_density"}:
+            if dispenser is None:
+                dispenser = create_local_dispenser()
+                owns_dispenser = True
             balance_device = balance_device or create_local_balance()
+        elif stage_key == "angle_of_repose" and prepared_repose_image is None:
+            if camera_device is None:
+                camera_device = create_local_camera()
+                owns_camera = True
 
         if stage_key == "calibration":
             stage_result = _run_calibration(
@@ -537,6 +549,7 @@ def run_single_test(
         elif stage_key == "angle_of_repose":
             stage_result = _run_repose(
                 camera=camera_device,
+                prepared_image_bytes=prepared_repose_image,
                 material_name=material_name,
                 timestamp=timestamp,
                 date_prefix=date_prefix,
@@ -568,10 +581,15 @@ def run_single_test(
     finally:
         if balance_device is not None:
             balance_device.disconnect()
-        if owns_dispenser:
-            dispenser.close()
-        else:
-            dispenser.stop_all()
+        if dispenser is not None:
+            if owns_dispenser:
+                dispenser.close()
+            else:
+                dispenser.stop_all()
+        if owns_camera:
+            close_camera = getattr(camera_device, "close", None)
+            if callable(close_camera):
+                close_camera()
 
     return {
         "metadata": {
@@ -827,7 +845,8 @@ def _run_bulk_density(
 
 def _run_repose(
     *,
-    camera: CameraInterface,
+    camera: CameraInterface | None,
+    prepared_image_bytes: bytes | None = None,
     material_name: str,
     timestamp: str,
     date_prefix: str,
@@ -835,6 +854,7 @@ def _run_repose(
     cancel_token: CancellationToken | None = None,
 ) -> dict[str, Any]:
     from operation.powder_flow_api import capture_and_analyze_repose, classify_repose
+    from operation.repose_analysis import analyze_repose
 
     _ensure_not_cancelled(cancel_token)
     _log_stage(hooks, "Flowability: measuring angle of repose")
@@ -848,12 +868,24 @@ def _run_repose(
             repose_dir = Path(tmp_dir)
             image_name = f"{date_prefix}raw_image.png"
             try:
-                image_path, analysis_artifacts, mean_angle = capture_and_analyze_repose(
-                    output_dir=repose_dir,
-                    image_name=image_name,
-                    file_prefix=date_prefix,
-                    camera=camera,
-                )
+                if prepared_image_bytes is None:
+                    if camera is None:
+                        raise RuntimeError("A camera is required when no prepared image is supplied.")
+                    image_path, analysis_artifacts, mean_angle = capture_and_analyze_repose(
+                        output_dir=repose_dir,
+                        image_name=image_name,
+                        file_prefix=date_prefix,
+                        camera=camera,
+                    )
+                else:
+                    image_path = repose_dir / image_name
+                    image_path.write_bytes(prepared_image_bytes)
+                    analysis_artifacts, mean_angle = analyze_repose(
+                        image_path,
+                        output_dir=repose_dir,
+                        file_prefix=date_prefix,
+                        method="direct_profile",
+                    )
                 artifacts["repose_raw_image"] = _artifact_entry(image_path)
                 for artifact_key, image in analysis_artifacts.items():
                     generated_path = repose_dir / f"{artifact_key}.png"

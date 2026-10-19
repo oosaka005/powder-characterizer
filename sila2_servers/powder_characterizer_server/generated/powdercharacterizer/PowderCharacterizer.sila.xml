@@ -129,7 +129,7 @@
     <Parameter>
       <Identifier>Stage</Identifier>
       <DisplayName>Stage</DisplayName>
-      <Description>calibration, bulk_density, tapped_density, or angle_of_repose.</Description>
+      <Description>calibration, bulk_density, tapped_density, angle_of_repose, or an internal prepared angle-of-repose image reference.</Description>
       <DataType>
         <Basic>String</Basic>
       </DataType>
@@ -288,8 +288,8 @@
     </Response>
     <Response>
       <Identifier>Filename</Identifier>
-      <DisplayName>Filename</DisplayName>
-      <Description>Filename.</Description>
+      <DisplayName>Preview ID</DisplayName>
+      <Description>Temporary image identifier used to analyze this exact capture.</Description>
       <DataType>
         <Basic>String</Basic>
       </DataType>
