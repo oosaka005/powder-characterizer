@@ -60,9 +60,23 @@ class TouchWebUiTests(unittest.TestCase):
         self.assertIn("renderHistoryArtifacts", self.javascript)
 
     def test_high_consequence_actions_use_confirmation_dialog(self) -> None:
-        self.assertIn("confirmAction('測定を中止'", self.javascript)
-        self.assertIn("confirmAction('測定結果を破棄'", self.javascript)
-        self.assertIn("confirmAction('詰まり除去'", self.javascript)
+        self.assertIn("confirmAction('Abort Measurement'", self.javascript)
+        self.assertIn("confirmAction('Discard Result'", self.javascript)
+        self.assertIn("confirmAction('Clear Clog'", self.javascript)
+
+    def test_source_code_contains_no_japanese_characters(self) -> None:
+        japanese = re.compile(r"[\u3040-\u30ff\u3400-\u9fff]")
+        suffixes = {".py", ".js", ".html", ".css", ".sh"}
+        excluded_parts = {".git", ".pytest_cache", "logs", "output"}
+        offenders = []
+        for path in ROOT.rglob("*"):
+            if path.suffix.lower() not in suffixes:
+                continue
+            if any(part in excluded_parts for part in path.parts):
+                continue
+            if japanese.search(path.read_text(encoding="utf-8", errors="ignore")):
+                offenders.append(str(path.relative_to(ROOT)))
+        self.assertEqual(offenders, [])
 
 
 if __name__ == "__main__":

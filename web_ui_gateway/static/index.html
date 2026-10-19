@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -10,35 +10,35 @@
 <body>
   <header class="app-header">
     <div class="brand">Powder Characterizer</div>
-    <div class="connection" aria-live="polite"><span id="conn-dot" class="dot"></span><span id="conn-label">接続中…</span></div>
+    <div class="connection" aria-live="polite"><span id="conn-dot" class="dot"></span><span id="conn-label">Connecting…</span></div>
   </header>
 
-  <nav id="main-nav" class="main-nav" aria-label="メインメニュー">
-    <button data-page="auto" class="active"><span class="nav-icon">▶</span><span>自動評価</span></button>
-    <button data-page="manual"><span class="nav-icon">⚙</span><span>手動操作</span></button>
-    <button data-page="single"><span class="nav-icon">◉</span><span>個別試験</span></button>
-    <button data-page="history"><span class="nav-icon">▦</span><span>測定履歴</span></button>
+  <nav id="main-nav" class="main-nav" aria-label="Main menu">
+    <button data-page="auto" class="active"><span class="nav-icon">▶</span><span>Automated</span></button>
+    <button data-page="manual"><span class="nav-icon">⚙</span><span>Manual</span></button>
+    <button data-page="single"><span class="nav-icon">◉</span><span>Single Test</span></button>
+    <button data-page="history"><span class="nav-icon">▦</span><span>Results</span></button>
     <button data-page="materials"><span class="nav-icon">▤</span><span>Material DB</span></button>
   </nav>
 
   <main>
     <section id="page-auto" class="page active">
-      <div class="workflow-nav" aria-label="自動評価の進行">
-        <button data-auto-view="setup" class="active"><span>1</span>条件設定</button>
-        <button data-auto-view="run"><span>2</span>測定状況</button>
-        <button data-auto-view="result"><span>3</span>測定結果</button>
+      <div class="workflow-nav" aria-label="Automated evaluation progress">
+        <button data-auto-view="setup" class="active"><span>1</span>Setup</button>
+        <button data-auto-view="run"><span>2</span>Run Status</button>
+        <button data-auto-view="result"><span>3</span>Result</button>
       </div>
 
       <div id="auto-setup" class="auto-view active">
-        <div class="page-title-row"><div><h1>評価条件</h1><p>材料と測定条件を選択してください。</p></div></div>
+        <div class="page-title-row"><div><h1>Evaluation Setup</h1><p>Select the material and measurement conditions.</p></div></div>
         <div class="touch-grid setup-grid">
           <article class="panel material-panel">
-            <h2>材料</h2>
+            <h2>Material</h2>
             <div class="field-row">
-              <label class="grow">材料名<select id="material_name" aria-label="材料名"></select></label>
-              <button id="new-material" class="secondary compact-action">新規材料</button>
+              <label class="grow">Material name<select id="material_name" aria-label="Material name"></select></label>
+              <button id="new-material" class="secondary compact-action">New Material</button>
             </div>
-            <div class="field-label">部品タイプ</div>
+            <div class="field-label">Part type</div>
             <div id="part_type" class="choice-group two" data-selection="single">
               <button class="choice-button" data-value="metal">Metal</button><button class="choice-button" data-value="plastic">Plastic</button>
             </div>
@@ -50,139 +50,139 @@
           </article>
 
           <article class="panel wide">
-            <h2>校正条件</h2>
+            <h2>Calibration Conditions</h2>
             <div class="setting-line">
-              <span class="field-label">振動レベル候補</span>
+              <span class="field-label">Vibration level candidates</span>
               <div id="vib_levels" class="choice-group five" data-selection="multi">
                 <button class="choice-button" data-value="1">1</button><button class="choice-button" data-value="2">2</button><button class="choice-button" data-value="3">3</button><button class="choice-button" data-value="4">4</button><button class="choice-button" data-value="5">5</button>
               </div>
             </div>
             <div class="setting-line">
-              <span class="field-label">振動時間候補</span>
+              <span class="field-label">Vibration time candidates</span>
               <div id="vib_times" class="choice-group three" data-selection="multi">
-                <button class="choice-button" data-value="1">1秒</button><button class="choice-button" data-value="2">2秒</button><button class="choice-button" data-value="3">3秒</button>
+                <button class="choice-button" data-value="1">1 s</button><button class="choice-button" data-value="2">2 s</button><button class="choice-button" data-value="3">3 s</button>
               </div>
             </div>
             <div class="stepper-grid">
-              <div><span class="field-label">各条件の吐出回数</span><div class="touch-stepper" data-min="1" data-max="20" data-step="1" data-decimals="0"><button class="stepper-minus" aria-label="減らす">−</button><button id="steps_per_level" class="stepper-value">5</button><button class="stepper-plus" aria-label="増やす">＋</button></div></div>
-              <div><span class="field-label">安定性確認の回数</span><div class="touch-stepper" data-min="1" data-max="20" data-step="1" data-decimals="0"><button class="stepper-minus" aria-label="減らす">−</button><button id="stability_steps" class="stepper-value">7</button><button class="stepper-plus" aria-label="増やす">＋</button></div></div>
+              <div><span class="field-label">Dispenses per condition</span><div class="touch-stepper" data-min="1" data-max="20" data-step="1" data-decimals="0"><button class="stepper-minus" aria-label="Decrease">−</button><button id="steps_per_level" class="stepper-value">5</button><button class="stepper-plus" aria-label="Increase">＋</button></div></div>
+              <div><span class="field-label">Stability test dispenses</span><div class="touch-stepper" data-min="1" data-max="20" data-step="1" data-decimals="0"><button class="stepper-minus" aria-label="Decrease">−</button><button id="stability_steps" class="stepper-value">7</button><button class="stepper-plus" aria-label="Increase">＋</button></div></div>
             </div>
           </article>
 
           <details class="panel wide advanced-panel">
-            <summary>詳細設定</summary>
+            <summary>Advanced Settings</summary>
             <div class="advanced-grid">
-              <div><span class="field-label">ノイズ閾値 (g)</span><div class="touch-stepper" data-min="0" data-max="1" data-step="0.001" data-decimals="3"><button class="stepper-minus">−</button><button id="noise_threshold" class="stepper-value">0.005</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">かさ密度 繰返し回数</span><div class="touch-stepper" data-min="1" data-max="20" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="bulk_repeats" class="stepper-value">7</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">かさ密度 弱振動</span><div class="touch-stepper" data-min="1" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="bulk_weak" class="stepper-value">1</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">かさ密度 強振動</span><div class="touch-stepper" data-min="1" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="bulk_strong" class="stepper-value">4</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">かさ密度 振動時間 (秒)</span><div class="touch-stepper" data-min="0" data-max="60" data-step="0.1" data-decimals="1"><button class="stepper-minus">−</button><button id="bulk_sec" class="stepper-value">1.0</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">タップ密度 繰返し回数</span><div class="touch-stepper" data-min="1" data-max="20" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="tapped_repeats" class="stepper-value">7</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">タップ密度 振動レベル</span><div class="touch-stepper" data-min="1" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="tapped_level" class="stepper-value">4</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">タップ密度 振動時間 (秒)</span><div class="touch-stepper" data-min="0" data-max="60" data-step="0.1" data-decimals="1"><button class="stepper-minus">−</button><button id="tapped_sec" class="stepper-value">3.0</button><button class="stepper-plus">＋</button></div></div>
+              <div><span class="field-label">Noise threshold (g)</span><div class="touch-stepper" data-min="0" data-max="1" data-step="0.001" data-decimals="3"><button class="stepper-minus">−</button><button id="noise_threshold" class="stepper-value">0.005</button><button class="stepper-plus">＋</button></div></div>
+              <div><span class="field-label">Bulk density repeats</span><div class="touch-stepper" data-min="1" data-max="20" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="bulk_repeats" class="stepper-value">7</button><button class="stepper-plus">＋</button></div></div>
+              <div><span class="field-label">Bulk density weak vibration</span><div class="touch-stepper" data-min="1" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="bulk_weak" class="stepper-value">1</button><button class="stepper-plus">＋</button></div></div>
+              <div><span class="field-label">Bulk density strong vibration</span><div class="touch-stepper" data-min="1" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="bulk_strong" class="stepper-value">4</button><button class="stepper-plus">＋</button></div></div>
+              <div><span class="field-label">Bulk density vibration time (s)</span><div class="touch-stepper" data-min="0" data-max="60" data-step="0.1" data-decimals="1"><button class="stepper-minus">−</button><button id="bulk_sec" class="stepper-value">1.0</button><button class="stepper-plus">＋</button></div></div>
+              <div><span class="field-label">Tapped density repeats</span><div class="touch-stepper" data-min="1" data-max="20" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="tapped_repeats" class="stepper-value">7</button><button class="stepper-plus">＋</button></div></div>
+              <div><span class="field-label">Tapped density vibration level</span><div class="touch-stepper" data-min="1" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="tapped_level" class="stepper-value">4</button><button class="stepper-plus">＋</button></div></div>
+              <div><span class="field-label">Tapped density vibration time (s)</span><div class="touch-stepper" data-min="0" data-max="60" data-step="0.1" data-decimals="1"><button class="stepper-minus">−</button><button id="tapped_sec" class="stepper-value">3.0</button><button class="stepper-plus">＋</button></div></div>
             </div>
           </details>
         </div>
-        <div class="sticky-actions"><button class="secondary" id="save-settings">条件を保存</button><button class="primary emphasis" id="save-start">保存して自動評価を開始</button></div>
+        <div class="sticky-actions"><button class="secondary" id="save-settings">Save Settings</button><button class="primary emphasis" id="save-start">Save and Start Automated Evaluation</button></div>
       </div>
 
       <div id="auto-run" class="auto-view">
-        <div class="page-title-row"><div><h1>測定状況</h1><p>ブラウザを閉じても測定は継続します。</p></div></div>
+        <div class="page-title-row"><div><h1>Run Status</h1><p>The measurement continues if the browser is closed.</p></div></div>
         <div class="status-grid">
-          <div class="metric-card"><span>状態</span><strong id="run-status">待機中</strong></div><div class="metric-card"><span>工程</span><strong id="run-stage">—</strong></div><div class="metric-card"><span>経過時間</span><strong id="run-elapsed">0.0秒</strong></div>
+          <div class="metric-card"><span>Status</span><strong id="run-status">Idle</strong></div><div class="metric-card"><span>Stage</span><strong id="run-stage">—</strong></div><div class="metric-card"><span>Elapsed time</span><strong id="run-elapsed">0.0 s</strong></div>
         </div>
-        <article class="panel wide run-panel"><progress id="run-progress" value="0" max="1"></progress><div class="button-row"><button class="primary" id="start-run">自動評価を開始</button><button class="danger" id="abort-run">測定を中止</button><button class="secondary" id="retry-run">同じ条件で再測定</button></div></article>
-        <details class="panel wide log-panel"><summary>詳細ログ</summary><pre id="run-log">測定待機中です。</pre></details>
+        <article class="panel wide run-panel"><progress id="run-progress" value="0" max="1"></progress><div class="button-row"><button class="primary" id="start-run">Start Automated Evaluation</button><button class="danger" id="abort-run">Abort Measurement</button><button class="secondary" id="retry-run">Run Again</button></div></article>
+        <details class="panel wide log-panel"><summary>Detailed Log</summary><pre id="run-log">Waiting for a measurement.</pre></details>
       </div>
 
       <div id="auto-result" class="auto-view">
-        <div class="page-title-row"><div><h1>測定結果</h1><p>内容を確認して保存または破棄してください。</p></div></div>
-        <div id="result-summary" class="result-summary"><div class="empty-state">測定結果はありません。</div></div>
+        <div class="page-title-row"><div><h1>Measurement Result</h1><p>Review the result, then save or discard it.</p></div></div>
+        <div id="result-summary" class="result-summary"><div class="empty-state">No measurement result is available.</div></div>
         <article class="panel wide result-actions">
-          <button id="update-db" class="toggle-button" role="switch" aria-checked="false"><span class="toggle-track"><span></span></span><span><strong>Material DBも更新</strong><small>オフの場合、測定ファイルのみ保存します</small></span></button>
-          <div class="button-row"><button class="primary emphasis" id="save-result">測定結果を保存</button><button class="danger" id="discard-result">結果を破棄</button></div>
+          <button id="update-db" class="toggle-button" role="switch" aria-checked="false"><span class="toggle-track"><span></span></span><span><strong>Update Material DB</strong><small>When off, only the measurement files are saved.</small></span></button>
+          <div class="button-row"><button class="primary emphasis" id="save-result">Save Result</button><button class="danger" id="discard-result">Discard Result</button></div>
         </article>
-        <details class="panel wide"><summary>画像・グラフ</summary><div id="artifacts" class="artifacts">画像はありません。</div></details>
-        <details class="panel wide"><summary>詳細データ (JSON)</summary><pre id="result-json" class="result-json">測定結果はありません。</pre></details>
+        <details class="panel wide"><summary>Images and Charts</summary><div id="artifacts" class="artifacts">No images are available.</div></details>
+        <details class="panel wide"><summary>Detailed Data (JSON)</summary><pre id="result-json" class="result-json">No measurement result is available.</pre></details>
       </div>
     </section>
 
     <section id="page-manual" class="page">
-      <div class="page-title-row"><div><h1>手動操作</h1><p>設定後、実行する操作を選んでください。</p></div></div>
+      <div class="page-title-row"><div><h1>Manual Operation</h1><p>Set the conditions, then select an operation.</p></div></div>
       <div class="touch-grid">
         <article class="panel">
-          <h2>手動吐出</h2>
+          <h2>Manual Dispense</h2>
           <div class="manual-settings">
-            <div><span class="field-label">振動レベル</span><div class="touch-stepper" data-min="0" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="manual_level" class="stepper-value">4</button><button class="stepper-plus">＋</button></div></div>
-            <div><span class="field-label">振動時間 (秒)</span><div class="touch-stepper" data-min="0" data-max="60" data-step="0.1" data-decimals="1"><button class="stepper-minus">−</button><button id="manual_sec" class="stepper-value">2.0</button><button class="stepper-plus">＋</button></div></div>
-            <div><span class="field-label">吐出回数</span><div class="touch-stepper" data-min="0" data-max="99" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="manual_count" class="stepper-value">4</button><button class="stepper-plus">＋</button></div></div>
+            <div><span class="field-label">Vibration level</span><div class="touch-stepper" data-min="0" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="manual_level" class="stepper-value">4</button><button class="stepper-plus">＋</button></div></div>
+            <div><span class="field-label">Vibration time (s)</span><div class="touch-stepper" data-min="0" data-max="60" data-step="0.1" data-decimals="1"><button class="stepper-minus">−</button><button id="manual_sec" class="stepper-value">2.0</button><button class="stepper-plus">＋</button></div></div>
+            <div><span class="field-label">Number of dispenses</span><div class="touch-stepper" data-min="0" data-max="99" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="manual_count" class="stepper-value">4</button><button class="stepper-plus">＋</button></div></div>
           </div>
-          <button id="manual_aug" class="toggle-button" role="switch" aria-checked="true"><span class="toggle-track"><span></span></span><span><strong>オーガーを使用</strong></span></button>
-          <div class="button-grid two"><button class="primary" id="manual-run">設定回数を吐出</button><button class="secondary" id="dispense-once">1回だけ吐出</button><button class="danger span-two" id="clear-clog">詰まり除去</button></div>
+          <button id="manual_aug" class="toggle-button" role="switch" aria-checked="true"><span class="toggle-track"><span></span></span><span><strong>Use Auger</strong></span></button>
+          <div class="button-grid two"><button class="primary" id="manual-run">Dispense Set Count</button><button class="secondary" id="dispense-once">Dispense Once</button><button class="danger span-two" id="clear-clog">Clear Clog</button></div>
         </article>
         <article class="panel">
-          <h2>カメラ</h2><span class="field-label">フォーカス</span>
-          <div id="focus_mode" class="choice-group two" data-selection="single"><button class="choice-button" data-value="auto">自動</button><button class="choice-button" data-value="manual">手動</button></div>
-          <div><span class="field-label">レンズ位置</span><div class="touch-stepper" data-min="0" data-max="32" data-step="0.1" data-decimals="1"><button class="stepper-minus">−</button><button id="lens_position" class="stepper-value">14.3</button><button class="stepper-plus">＋</button></div></div>
-          <div class="button-grid two"><button class="secondary" id="camera-preview">カメラ確認</button><button class="secondary" id="repose-preview">安息角画像確認</button></div><img id="preview-image" alt="カメラプレビュー">
+          <h2>Camera</h2><span class="field-label">Focus mode</span>
+          <div id="focus_mode" class="choice-group two" data-selection="single"><button class="choice-button" data-value="auto">Auto</button><button class="choice-button" data-value="manual">Manual</button></div>
+          <div><span class="field-label">Lens position</span><div class="touch-stepper" data-min="0" data-max="32" data-step="0.1" data-decimals="1"><button class="stepper-minus">−</button><button id="lens_position" class="stepper-value">14.3</button><button class="stepper-plus">＋</button></div></div>
+          <div class="button-grid two"><button class="secondary" id="camera-preview">Camera Preview</button><button class="secondary" id="repose-preview">Repose Image Preview</button></div><img id="preview-image" alt="Camera preview">
         </article>
       </div>
     </section>
 
     <section id="page-single" class="page">
-      <div class="page-title-row"><div><h1>個別試験</h1><p>実施する試験を選択してください。</p></div></div>
+      <div class="page-title-row"><div><h1>Single Test</h1><p>Select the test to run.</p></div></div>
       <div class="single-grid">
-        <button class="test-button single" data-stage="calibration"><span class="test-icon">C</span><span><strong>校正</strong><small>Calibration</small></span></button>
-        <button class="test-button single" data-stage="bulk_density"><span class="test-icon">B</span><span><strong>かさ密度</strong><small>Bulk Density</small></span></button>
-        <button class="test-button single" data-stage="tapped_density"><span class="test-icon">T</span><span><strong>タップ密度</strong><small>Tapped Density</small></span></button>
-        <button class="test-button single" data-stage="angle_of_repose"><span class="test-icon">A</span><span><strong>安息角</strong><small>Angle of Repose</small></span></button>
+        <button class="test-button single" data-stage="calibration"><span class="test-icon">C</span><span><strong>Calibration</strong><small>Optimize vibration conditions</small></span></button>
+        <button class="test-button single" data-stage="bulk_density"><span class="test-icon">B</span><span><strong>Bulk Density</strong><small>Measure loose powder density</small></span></button>
+        <button class="test-button single" data-stage="tapped_density"><span class="test-icon">T</span><span><strong>Tapped Density</strong><small>Measure compacted powder density</small></span></button>
+        <button class="test-button single" data-stage="angle_of_repose"><span class="test-icon">A</span><span><strong>Angle of Repose</strong><small>Analyze the powder pile image</small></span></button>
       </div>
-      <article class="panel preparation-panel"><h2>試験前の準備</h2><div class="button-grid two"><button class="secondary" id="single-dispense">1回吐出</button><button class="secondary" id="single-capture">画像を確認</button></div></article>
+      <article class="panel preparation-panel"><h2>Test Preparation</h2><div class="button-grid two"><button class="secondary" id="single-dispense">Dispense Once</button><button class="secondary" id="single-capture">Preview Image</button></div></article>
     </section>
 
     <section id="page-history" class="page">
-      <div class="page-title-row"><div><h1>測定履歴</h1><p>保存済みの評価結果を、概要と詳細に分けて確認できます。</p></div><button class="secondary" id="refresh-history">更新</button></div>
+      <div class="page-title-row"><div><h1>Measurement Results</h1><p>Review saved evaluation summaries, charts, and images.</p></div><button class="secondary" id="refresh-history">Refresh</button></div>
       <article class="panel history-filter-panel">
         <div class="history-select-grid">
           <label>Dispenser ID<select id="history-dispenser"></select></label>
-          <label>材料名<select id="history-material"></select></label>
+          <label>Material name<select id="history-material"></select></label>
           <label>Disk ID<select id="history-disk"></select></label>
         </div>
         <div class="history-evaluation-row">
-          <span class="field-label">表示する評価結果</span>
+          <span class="field-label">Evaluation result</span>
           <div id="history-evaluation" class="choice-group three" data-selection="single">
-            <button class="choice-button selected" data-value="calibration">振動条件最適化</button>
-            <button class="choice-button" data-value="hausner">ハウスナー比</button>
-            <button class="choice-button" data-value="angle_of_repose">安息角</button>
+            <button class="choice-button selected" data-value="calibration">Vibration Optimization</button>
+            <button class="choice-button" data-value="hausner">Hausner Ratio</button>
+            <button class="choice-button" data-value="angle_of_repose">Angle of Repose</button>
           </div>
         </div>
-        <label>測定日時<select id="history-record"></select></label>
+        <label>Measurement date and time<select id="history-record"></select></label>
       </article>
 
       <section aria-labelledby="history-overview-title">
-        <div class="history-section-heading"><div><h2 id="history-overview-title">結果概要</h2><p id="history-context">条件を選択してください。</p></div><span id="history-source" class="source-badge"></span></div>
-        <div id="history-overview" class="result-summary"><div class="empty-state">履歴を読み込み中…</div></div>
+        <div class="history-section-heading"><div><h2 id="history-overview-title">Result Summary</h2><p id="history-context">Select the conditions above.</p></div><span id="history-source" class="source-badge"></span></div>
+        <div id="history-overview" class="result-summary"><div class="empty-state">Loading measurement history…</div></div>
       </section>
 
       <details id="history-details" class="panel history-details">
-        <summary>グラフ・画像で詳細を確認</summary>
+        <summary>View Detailed Charts and Images</summary>
         <div id="history-charts" class="history-charts"></div>
         <div id="history-artifacts" class="artifacts"></div>
-        <details class="raw-details"><summary>数値データ (JSON)</summary><pre id="history-json" class="result-json">結果を選択してください。</pre></details>
+        <details class="raw-details"><summary>Numerical Data (JSON)</summary><pre id="history-json" class="result-json">Select a result.</pre></details>
       </details>
     </section>
 
     <section id="page-materials" class="page">
-      <div class="page-title-row"><div><h1>Material DB</h1><p>材料とDisk IDを選ぶと登録値を確認できます。</p></div><button class="secondary" id="refresh-materials">更新</button></div>
-      <article class="panel filter-panel"><label>材料名<select id="material-filter"></select></label><label>Disk ID<select id="disk-filter"></select></label></article>
-      <div id="material-cards" class="material-cards"><div class="empty-state">読み込み中…</div></div>
+      <div class="page-title-row"><div><h1>Material DB</h1><p>Select a material and Disk ID to review the registered values.</p></div><button class="secondary" id="refresh-materials">Refresh</button></div>
+      <article class="panel filter-panel"><label>Material name<select id="material-filter"></select></label><label>Disk ID<select id="disk-filter"></select></label></article>
+      <div id="material-cards" class="material-cards"><div class="empty-state">Loading…</div></div>
     </section>
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <dialog id="numeric-dialog" class="touch-dialog"><form method="dialog"><h2 id="numeric-title">数値を入力</h2><output id="numeric-display">0</output><div id="numeric-keypad" class="numeric-keypad"></div><div class="dialog-actions"><button value="cancel" class="secondary">キャンセル</button><button id="numeric-ok" value="default" class="primary">決定</button></div></form></dialog>
-  <dialog id="text-dialog" class="touch-dialog text-dialog"><form method="dialog"><h2>新しい材料名</h2><output id="text-display"></output><div id="text-keyboard" class="text-keyboard"></div><div class="dialog-actions"><button value="cancel" class="secondary">キャンセル</button><button id="text-ok" value="default" class="primary">決定</button></div></form></dialog>
-  <dialog id="confirm-dialog" class="touch-dialog confirm-dialog"><form method="dialog"><h2 id="confirm-title">確認</h2><p id="confirm-message"></p><div class="dialog-actions"><button value="cancel" class="secondary">戻る</button><button id="confirm-ok" value="default" class="danger">実行する</button></div></form></dialog>
+  <dialog id="numeric-dialog" class="touch-dialog"><form method="dialog"><h2 id="numeric-title">Enter a Number</h2><output id="numeric-display">0</output><div id="numeric-keypad" class="numeric-keypad"></div><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="numeric-ok" value="default" class="primary">Apply</button></div></form></dialog>
+  <dialog id="text-dialog" class="touch-dialog text-dialog"><form method="dialog"><h2>New Material Name</h2><output id="text-display"></output><div id="text-keyboard" class="text-keyboard"></div><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="text-ok" value="default" class="primary">Apply</button></div></form></dialog>
+  <dialog id="confirm-dialog" class="touch-dialog confirm-dialog"><form method="dialog"><h2 id="confirm-title">Confirmation</h2><p id="confirm-message"></p><div class="dialog-actions"><button value="cancel" class="secondary">Back</button><button id="confirm-ok" value="default" class="danger">Continue</button></div></form></dialog>
   <script src="/static/app.js" defer></script>
 </body>
 </html>

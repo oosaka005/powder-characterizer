@@ -17,9 +17,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DISPENSER_ID = "powder_dispenser"
 EVALUATIONS = {"calibration", "hausner", "angle_of_repose"}
 SOURCE_LABELS = {
-    "all": "自動評価",
-    "single": "個別試験",
-    "old": "旧形式",
+    "all": "Automated Evaluation",
+    "single": "Single Test",
+    "old": "Legacy Format",
 }
 
 
@@ -80,19 +80,19 @@ def _metadata_values(payload: dict[str, Any]) -> tuple[str, str, str, str]:
 def _artifact_label(filename: str) -> str:
     lowered = filename.lower()
     if "level_exploration" in lowered:
-        return "振動レベル探索"
+        return "Vibration Level Exploration"
     if "vib_time_exploration" in lowered or "time_exploration" in lowered:
-        return "振動時間探索"
+        return "Vibration Time Exploration"
     if "stability" in lowered:
-        return "安定性確認"
+        return "Stability Test"
     if "cropped" in lowered:
-        return "切り出し画像"
+        return "Cropped Image"
     if "processed" in lowered:
-        return "輪郭処理画像"
+        return "Processed Contour Image"
     if "fit" in lowered:
-        return "フィッティング結果"
+        return "Fitted Lines"
     if "raw_image" in lowered:
-        return "撮影画像"
+        return "Captured Image"
     return filename
 
 
@@ -405,7 +405,7 @@ def _single_hausner_records(single_payloads: list[tuple[Path, dict[str, Any]]]) 
                 material_name=material,
                 disk_id=disk,
                 timestamp=timestamp,
-                source_label="個別試験（最新の組合せ）",
+                source_label="Single Test (Latest Pair)",
                 overview={
                     "success": bool(bulk.get("success")) and bool(tapped.get("success")),
                     "bulk_density_mean": bulk.get("mean"),

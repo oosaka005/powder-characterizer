@@ -100,7 +100,7 @@ function buildNumericKeypad() {
 
 function openNumericKeypad(display) {
   numericTarget = display;
-  $('numeric-title').textContent = display.closest('div').previousElementSibling?.textContent || '数値を入力';
+  $('numeric-title').textContent = display.closest('div').previousElementSibling?.textContent || 'Enter a Number';
   $('numeric-display').textContent = display.textContent;
   $('numeric-dialog').showModal();
 }
@@ -130,7 +130,7 @@ function buildTextKeyboard() {
     keyboard.appendChild(row);
   });
   const actions = document.createElement('div'); actions.className='keyboard-row actions';
-  [['shift','Aa'],['hyphen','－'],['space','スペース'],['back','⌫']].forEach(([key,label]) => { const button=document.createElement('button'); button.type='button'; button.textContent=label; button.addEventListener('click',()=>textKey(key)); actions.appendChild(button); });
+  [['shift','Aa'],['hyphen','-'],['space','Space'],['back','⌫']].forEach(([key,label]) => { const button=document.createElement('button'); button.type='button'; button.textContent=label; button.addEventListener('click',()=>textKey(key)); actions.appendChild(button); });
   keyboard.appendChild(actions);
 }
 
@@ -147,7 +147,7 @@ $('new-material').addEventListener('click', () => { $('text-display').textConten
 $('text-ok').addEventListener('click', event => {
   event.preventDefault();
   const name = $('text-display').textContent.trim();
-  if (!name) { toast('材料名を入力してください。', true); return; }
+  if (!name) { toast('Enter a material name.', true); return; }
   const select = $('material_name');
   if (![...select.options].some(option => option.value === name)) select.add(new Option(name, name));
   select.value = name;
@@ -158,7 +158,7 @@ function setToggle(id, enabled) { $(id).setAttribute('aria-checked', enabled ? '
 function getToggle(id) { return $(id).getAttribute('aria-checked') === 'true'; }
 ['manual_aug','update-db'].forEach(id => $(id).addEventListener('click', () => setToggle(id, !getToggle(id))));
 
-function confirmAction(title, message, confirmLabel='実行する') {
+function confirmAction(title, message, confirmLabel='Continue') {
   $('confirm-title').textContent=title; $('confirm-message').textContent=message; $('confirm-ok').textContent=confirmLabel;
   $('confirm-dialog').returnValue='';
   $('confirm-dialog').showModal();
@@ -191,8 +191,8 @@ function fillSettings(value) {
 function collectSettings() {
   const result=structuredClone(settings);
   const levels=getMultiChoices('vib_levels'), times=getMultiChoices('vib_times');
-  if (!levels.length) throw new Error('振動レベルを1つ以上選択してください。');
-  if (!times.length) throw new Error('振動時間を1つ以上選択してください。');
+  if (!levels.length) throw new Error('Select at least one vibration level.');
+  if (!times.length) throw new Error('Select at least one vibration time.');
   Object.assign(result.material,{material_name:$('material_name').value,part_type:getSingleChoice('part_type'),disk_id:getSingleChoice('disk_id')});
   Object.assign(result.calibration,{vib_levels:levels,vib_time_candidates:times,steps_per_level:getStepValue('steps_per_level'),stability_steps:getStepValue('stability_steps'),noise_threshold_g:getStepValue('noise_threshold')});
   Object.assign(result.bulk_density,{repeats:getStepValue('bulk_repeats'),weak_vib_level:getStepValue('bulk_weak'),strong_vib_level:getStepValue('bulk_strong'),vib_sec_default:getStepValue('bulk_sec')});
@@ -201,24 +201,24 @@ function collectSettings() {
   return result;
 }
 
-async function saveSettings() { settings=collectSettings(); await api('/api/settings',{method:'PUT',body:JSON.stringify(settings)}); toast('評価条件を保存しました。'); }
-async function startAutomated() { await api('/api/runs/automated',{method:'POST'}); showPage('auto'); showAutoView('run'); toast('自動評価を開始しました。'); }
+async function saveSettings() { settings=collectSettings(); await api('/api/settings',{method:'PUT',body:JSON.stringify(settings)}); toast('Evaluation settings saved.'); }
+async function startAutomated() { await api('/api/runs/automated',{method:'POST'}); showPage('auto'); showAutoView('run'); toast('Automated evaluation started.'); }
 async function retryAutomated() { await api('/api/results/discard',{method:'POST'}); await startAutomated(); }
 
 $('save-settings').addEventListener('click',()=>saveSettings().catch(error=>toast(error.message,true)));
 $('save-start').addEventListener('click',async()=>{try{await saveSettings();await startAutomated();}catch(error){toast(error.message,true);}});
 $('start-run').addEventListener('click',()=>startAutomated().catch(error=>toast(error.message,true)));
-$('retry-run').addEventListener('click',async()=>{if(await confirmAction('同じ条件で再測定','現在の保存待ち結果を破棄して、同じ条件で測定を開始します。','再測定する')) retryAutomated().catch(error=>toast(error.message,true));});
-$('abort-run').addEventListener('click',async()=>{if(await confirmAction('測定を中止','進行中の測定を中止します。よろしいですか？','測定を中止')) api('/api/runs/abort',{method:'POST'}).then(()=>toast('測定中止を要求しました。')).catch(error=>toast(error.message,true));});
+$('retry-run').addEventListener('click',async()=>{if(await confirmAction('Run Again','The pending result will be discarded before starting another measurement with the same settings.','Run Again')) retryAutomated().catch(error=>toast(error.message,true));});
+$('abort-run').addEventListener('click',async()=>{if(await confirmAction('Abort Measurement','Abort the measurement currently in progress?','Abort Measurement')) api('/api/runs/abort',{method:'POST'}).then(()=>toast('Measurement abort requested.')).catch(error=>toast(error.message,true));});
 
-const statusLabels={idle:'待機中',running:'測定中',completed:'完了',failed:'エラー',aborted:'中止',gateway_error:'接続エラー'};
-const stageLabels={calibration:'校正',bulk_density:'かさ密度',tapped_density:'タップ密度',angle_of_repose:'安息角',manual:'手動操作'};
+const statusLabels={idle:'Idle',running:'Running',completed:'Completed',failed:'Error',aborted:'Aborted',gateway_error:'Connection Error'};
+const stageLabels={calibration:'Calibration',bulk_density:'Bulk Density',tapped_density:'Tapped Density',angle_of_repose:'Angle of Repose',manual:'Manual Operation'};
 const formatNumber=(value,digits=3)=>value===null||value===undefined||value===''?'—':Number.isFinite(Number(value))?Number(value).toFixed(digits).replace(/\.?0+$/,''):String(value);
 
 function updateState(state) {
   const previousPending=Boolean(latestState?.result_pending); latestState=state;
-  $('run-status').textContent=statusLabels[state.status]||state.status||'不明'; $('run-stage').textContent=stageLabels[state.stage]||state.stage||'—'; $('run-elapsed').textContent=`${Number(state.elapsed_sec||0).toFixed(1)}秒`; $('run-progress').value=state.progress||0;
-  $('run-log').textContent=(state.logs||[]).join('\n')||'測定待機中です。'; $('result-json').textContent=state.result?JSON.stringify(state.result,null,2):state.error||'測定結果はありません。';
+  $('run-status').textContent=statusLabels[state.status]||state.status||'Unknown'; $('run-stage').textContent=stageLabels[state.stage]||state.stage||'—'; $('run-elapsed').textContent=`${Number(state.elapsed_sec||0).toFixed(1)} s`; $('run-progress').value=state.progress||0;
+  $('run-log').textContent=(state.logs||[]).join('\n')||'Waiting for a measurement.'; $('result-json').textContent=state.result?JSON.stringify(state.result,null,2):state.error||'No measurement result is available.';
   const running=state.status==='running', pending=Boolean(state.result_pending);
   $('start-run').disabled=running||pending; $('retry-run').disabled=running||!pending; $('abort-run').disabled=!running; $('save-result').disabled=!pending; $('discard-result').disabled=!pending;
   renderResultSummary(state); renderArtifacts(state);
@@ -228,32 +228,32 @@ function updateState(state) {
 
 function renderResultSummary(state) {
   const root=state.result; const box=$('result-summary');
-  if (!root) { box.innerHTML='<div class="empty-state">測定結果はありません。</div>'; return; }
+  if (!root) { box.innerHTML='<div class="empty-state">No measurement result is available.</div>'; return; }
   const data=root.result_data||root; const metadata=data.metadata||root.metadata||{}; const calibration=data.calibration; const hausner=data.hausner; const repose=data.angle_of_repose;
   const cards=[]; const material=metadata.app_settings?.material?.material_name||metadata.material_name;
-  if(material) cards.push(['材料',material]);
-  if(calibration) cards.push(['選択振動レベル',formatNumber(calibration.selected_vib_level,0)],['吐出質量平均',`${formatNumber(calibration.step_mass_mean)} g`]);
-  if(hausner) cards.push(['かさ密度',formatNumber(hausner.bulk_density?.mean)],['タップ密度',formatNumber(hausner.tapped_density?.mean)],['Hausner比',formatNumber(hausner.ratio)],['流動性',hausner.class||'—']);
-  if(repose) cards.push(['安息角',`${formatNumber(repose.angle_deg,1)}°`],['安息角評価',repose.class||'—']);
+  if(material) cards.push(['Material',material]);
+  if(calibration) cards.push(['Selected Vibration Level',formatNumber(calibration.selected_vib_level,0)],['Mean Dispense Mass',`${formatNumber(calibration.step_mass_mean)} g`]);
+  if(hausner) cards.push(['Bulk Density',formatNumber(hausner.bulk_density?.mean)],['Tapped Density',formatNumber(hausner.tapped_density?.mean)],['Hausner Ratio',formatNumber(hausner.ratio)],['Flowability',hausner.class||'—']);
+  if(repose) cards.push(['Angle of Repose',`${formatNumber(repose.angle_deg,1)}°`],['Repose Classification',repose.class||'—']);
   const stage=metadata.stage; const stageData=stage?data[stage]:null;
-  if(stageData&&!calibration&&!hausner&&!repose){if(stageData.mean!==undefined)cards.push(['平均値',formatNumber(stageData.mean)],['標準偏差',formatNumber(stageData.stdev)]);if(stageData.angle_deg!==undefined)cards.push(['安息角',`${formatNumber(stageData.angle_deg,1)}°`],['評価',stageData.class||'—']);}
-  box.innerHTML=(cards.length?cards:[['状態','結果を確認してください']]).map(([label,value])=>`<div class="result-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+  if(stageData&&!calibration&&!hausner&&!repose){if(stageData.mean!==undefined)cards.push(['Mean',formatNumber(stageData.mean)],['Standard Deviation',formatNumber(stageData.stdev)]);if(stageData.angle_deg!==undefined)cards.push(['Angle of Repose',`${formatNumber(stageData.angle_deg,1)}°`],['Classification',stageData.class||'—']);}
+  box.innerHTML=(cards.length?cards:[['Status','Review the result.']]).map(([label,value])=>`<div class="result-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
 }
 
 function renderArtifacts(state) {
   const box=$('artifacts'), artifacts=state.result?.artifacts||{}, entries=Object.values(artifacts);
-  if(!entries.length){box.textContent='画像はありません。';return;}
+  if(!entries.length){box.textContent='No images are available.';return;}
   box.innerHTML=entries.map(item=>{const filename=String(item.filename||'');const url=`/api/runs/${encodeURIComponent(state.run_id)}/artifacts/${encodeURIComponent(filename)}`;return `<figure><a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="${escapeHtml(filename)}"></a><figcaption>${escapeHtml(filename)}</figcaption></figure>`;}).join('');
 }
 
-$('save-result').addEventListener('click',()=>api('/api/results/save',{method:'POST',body:JSON.stringify({update_material_database:getToggle('update-db')})}).then(async()=>{toast('測定結果を保存しました。');setToggle('update-db',false);await loadMaterials();showAutoView('setup');}).catch(error=>toast(error.message,true)));
-$('discard-result').addEventListener('click',async()=>{if(await confirmAction('測定結果を破棄','この測定結果は保存されません。破棄してよろしいですか？','結果を破棄')) api('/api/results/discard',{method:'POST'}).then(()=>{toast('測定結果を破棄しました。');showAutoView('setup');}).catch(error=>toast(error.message,true));});
+$('save-result').addEventListener('click',()=>api('/api/results/save',{method:'POST',body:JSON.stringify({update_material_database:getToggle('update-db')})}).then(async()=>{toast('Measurement result saved.');setToggle('update-db',false);await loadMaterials();showAutoView('setup');}).catch(error=>toast(error.message,true)));
+$('discard-result').addEventListener('click',async()=>{if(await confirmAction('Discard Result','This measurement result will not be saved. Discard it?','Discard Result')) api('/api/results/discard',{method:'POST'}).then(()=>{toast('Measurement result discarded.');showAutoView('setup');}).catch(error=>toast(error.message,true));});
 
 async function saveManualFields(){settings=collectSettings();await api('/api/settings',{method:'PUT',body:JSON.stringify(settings)});}
 async function manualRun(count=null){await saveManualFields();const payload={vibration_level:getStepValue('manual_level'),vibration_seconds:getStepValue('manual_sec'),dose_count:count??getStepValue('manual_count'),use_auger:getToggle('manual_aug')};await api('/api/runs/manual',{method:'POST',body:JSON.stringify(payload)});showPage('auto');showAutoView('run');}
 $('manual-run').addEventListener('click',()=>manualRun().catch(error=>toast(error.message,true)));
 $('dispense-once').addEventListener('click',()=>manualRun(1).catch(error=>toast(error.message,true)));
-$('clear-clog').addEventListener('click',async()=>{if(await confirmAction('詰まり除去','ディスペンサーの詰まり除去動作を実行します。','詰まり除去を実行')) api('/api/runs/clear-clog',{method:'POST'}).then(()=>toast('詰まり除去が完了しました。')).catch(error=>toast(error.message,true));});
+$('clear-clog').addEventListener('click',async()=>{if(await confirmAction('Clear Clog','Run the dispenser clog-clearing operation?','Clear Clog')) api('/api/runs/clear-clog',{method:'POST'}).then(()=>toast('Clog-clearing operation completed.')).catch(error=>toast(error.message,true));});
 
 async function preview(url,body){const blob=await api(url,{method:'POST',body:body?JSON.stringify(body):undefined});if(previewUrl)URL.revokeObjectURL(previewUrl);previewUrl=URL.createObjectURL(blob);$('preview-image').src=previewUrl;$('preview-image').style.display='block';}
 $('camera-preview').addEventListener('click',async()=>{try{await saveManualFields();await preview('/api/camera/preview',{focus_mode:getSingleChoice('focus_mode'),lens_position:getStepValue('lens_position')});}catch(error){toast(error.message,true);}});
@@ -263,22 +263,22 @@ document.querySelectorAll('.single').forEach(button=>button.addEventListener('cl
 $('single-dispense').addEventListener('click',()=>manualRun(1).catch(error=>toast(error.message,true)));
 $('single-capture').addEventListener('click',()=>preview('/api/camera/repose-preview').then(()=>showPage('manual')).catch(error=>toast(error.message,true)));
 
-function populateMaterialFilters(){const names=[...new Set(materialRows.map(row=>row.mat_name).filter(Boolean))].sort((a,b)=>a.localeCompare(b));$('material-filter').replaceChildren(new Option('すべての材料',''),...names.map(name=>new Option(name,name)));updateDiskFilter();}
-function updateDiskFilter(){const material=$('material-filter').value;const disks=[...new Set(materialRows.filter(row=>!material||row.mat_name===material).map(row=>row.diskID).filter(Boolean))].sort();const current=$('disk-filter').value;$('disk-filter').replaceChildren(new Option('すべて',''),...disks.map(id=>new Option(id,id)));if(disks.includes(current))$('disk-filter').value=current;renderMaterialCards();}
-function renderMaterialCards(){const material=$('material-filter').value,disk=$('disk-filter').value;const rows=materialRows.filter(row=>(!material||row.mat_name===material)&&(!disk||row.diskID===disk));const fields=[['volume_ml','容量 (mL)'],['vib_level','振動レベル'],['vib_time','振動時間 (秒)'],['step_mass_mean','吐出質量平均 (g)'],['density_g_per_ml','密度 (g/mL)'],['bulk_density_mean','かさ密度'],['tapped_density_mean','タップ密度'],['hausner_ratio','Hausner比'],['hausner_class','流動性'],['angle_of_repose_deg','安息角 (°)'],['repose_class','安息角評価']];$('material-cards').innerHTML=rows.length?rows.map(row=>`<article class="material-card"><h2><span>${escapeHtml(row.mat_name)}</span><span class="disk-badge">${escapeHtml(row.diskID)}</span></h2><div class="material-values">${fields.map(([key,label])=>`<div class="material-value"><span>${escapeHtml(label)}</span><strong>${escapeHtml(formatNumber(row[key]))}</strong></div>`).join('')}</div></article>`).join(''):'<div class="empty-state">該当するMaterial DBレコードはありません。</div>';}
+function populateMaterialFilters(){const names=[...new Set(materialRows.map(row=>row.mat_name).filter(Boolean))].sort((a,b)=>a.localeCompare(b));$('material-filter').replaceChildren(new Option('All Materials',''),...names.map(name=>new Option(name,name)));updateDiskFilter();}
+function updateDiskFilter(){const material=$('material-filter').value;const disks=[...new Set(materialRows.filter(row=>!material||row.mat_name===material).map(row=>row.diskID).filter(Boolean))].sort();const current=$('disk-filter').value;$('disk-filter').replaceChildren(new Option('All Disk IDs',''),...disks.map(id=>new Option(id,id)));if(disks.includes(current))$('disk-filter').value=current;renderMaterialCards();}
+function renderMaterialCards(){const material=$('material-filter').value,disk=$('disk-filter').value;const rows=materialRows.filter(row=>(!material||row.mat_name===material)&&(!disk||row.diskID===disk));const fields=[['volume_ml','Volume (mL)'],['vib_level','Vibration Level'],['vib_time','Vibration Time (s)'],['step_mass_mean','Mean Dispense Mass (g)'],['density_g_per_ml','Density (g/mL)'],['bulk_density_mean','Bulk Density'],['tapped_density_mean','Tapped Density'],['hausner_ratio','Hausner Ratio'],['hausner_class','Flowability'],['angle_of_repose_deg','Angle of Repose (°)'],['repose_class','Repose Classification']];$('material-cards').innerHTML=rows.length?rows.map(row=>`<article class="material-card"><h2><span>${escapeHtml(row.mat_name)}</span><span class="disk-badge">${escapeHtml(row.diskID)}</span></h2><div class="material-values">${fields.map(([key,label])=>`<div class="material-value"><span>${escapeHtml(label)}</span><strong>${escapeHtml(formatNumber(row[key]))}</strong></div>`).join('')}</div></article>`).join(''):'<div class="empty-state">No matching Material DB records were found.</div>';}
 async function loadMaterials(){try{const previousMaterial=$('material-filter').value;materialRows=await api('/api/materials');populateMaterialOptions(materialRows,settings?.material?.material_name||'');populateMaterialFilters();if([...$('material-filter').options].some(option=>option.value===previousMaterial))$('material-filter').value=previousMaterial;updateDiskFilter();}catch(error){toast(error.message,true);}}
 $('material-filter').addEventListener('change',updateDiskFilter);$('disk-filter').addEventListener('change',renderMaterialCards);$('refresh-materials').addEventListener('click',loadMaterials);
 
-const evaluationLabels={calibration:'振動条件最適化',hausner:'ハウスナー比',angle_of_repose:'安息角'};
-const classLabels={Excellent:'Excellent（優秀）',Good:'Good（良好）',Fair:'Fair（普通）',Passable:'Passable（可）',Poor:'Poor（不良）','Very poor':'Very poor（非常に不良）','Very, very poor':'Very, very poor（極めて不良）'};
+const evaluationLabels={calibration:'Vibration Optimization',hausner:'Hausner Ratio',angle_of_repose:'Angle of Repose'};
+const classLabels={Excellent:'Excellent',Good:'Good',Fair:'Fair',Passable:'Passable',Poor:'Poor','Very poor':'Very Poor','Very, very poor':'Very, Very Poor'};
 
 function formatHistoryTimestamp(value) {
   const match=String(value||'').match(/^(\d{4})(\d{2})(\d{2})[_ T]?(\d{2})?(\d{2})?(\d{2})?/);
-  if(!match) return value||'日時不明';
+  if(!match) return value||'Unknown date';
   return `${match[1]}/${match[2]}/${match[3]}${match[4]?` ${match[4]}:${match[5]||'00'}:${match[6]||'00'}`:''}`;
 }
 
-function uniqueValues(rows,key){return [...new Set(rows.map(row=>row[key]).filter(value=>value!==null&&value!==undefined&&value!==''))].sort((a,b)=>String(a).localeCompare(String(b),'ja',{numeric:true}));}
+function uniqueValues(rows,key){return [...new Set(rows.map(row=>row[key]).filter(value=>value!==null&&value!==undefined&&value!==''))].sort((a,b)=>String(a).localeCompare(String(b),'en',{numeric:true}));}
 function syncSelect(id,values,preferred,labeler=value=>value){
   const select=$(id), current=preferred??select.value;
   select.replaceChildren(...values.map(value=>new Option(labeler(value),value)));
@@ -288,7 +288,7 @@ function syncSelect(id,values,preferred,labeler=value=>value){
 
 async function loadHistory(force=false){
   if(historyLoaded&&!force){rebuildHistoryFilters();return;}
-  $('history-overview').innerHTML='<div class="empty-state">履歴を読み込み中…</div>';
+  $('history-overview').innerHTML='<div class="empty-state">Loading measurement history…</div>';
   try{
     historyRecords=await api('/api/results/history');
     historyLoaded=true;
@@ -310,23 +310,23 @@ function rebuildHistoryFilters(){
   const records=evaluationRows.filter(row=>row.disk_id===disk).sort((a,b)=>String(b.timestamp).localeCompare(String(a.timestamp)));
   const selected=syncSelect('history-record',records.map(row=>row.id),undefined,id=>{
     const row=records.find(item=>item.id===id);
-    return `${formatHistoryTimestamp(row?.timestamp)} ・ ${row?.source_label||''}`;
+    return `${formatHistoryTimestamp(row?.timestamp)} · ${row?.source_label||''}`;
   });
   if(selected) loadHistoryDetail(selected);
-  else renderHistoryEmpty(`${evaluationLabels[evaluation]}の保存結果がありません。`);
+  else renderHistoryEmpty(`No saved ${evaluationLabels[evaluation]} result is available.`);
 }
 
 function renderHistoryEmpty(message){
   historyRequest+=1;
   $('history-overview').innerHTML=`<div class="empty-state">${escapeHtml(message)}</div>`;
-  $('history-context').textContent='選択条件に該当する結果はありません。';
+  $('history-context').textContent='No result matches the selected conditions.';
   $('history-source').classList.remove('visible');
-  $('history-charts').replaceChildren();$('history-artifacts').replaceChildren();$('history-json').textContent='結果がありません。';
+  $('history-charts').replaceChildren();$('history-artifacts').replaceChildren();$('history-json').textContent='No result is available.';
 }
 
 async function loadHistoryDetail(recordId){
   const request=++historyRequest;
-  $('history-overview').innerHTML='<div class="empty-state">結果を読み込み中…</div>';
+  $('history-overview').innerHTML='<div class="empty-state">Loading result…</div>';
   try{
     const record=await api(`/api/results/history/${encodeURIComponent(recordId)}`);
     if(request!==historyRequest) return;
@@ -334,7 +334,7 @@ async function loadHistoryDetail(recordId){
   }catch(error){if(request===historyRequest)renderHistoryEmpty(error.message);}
 }
 
-function outcomeLabel(value){return value===true?'成功':value===false?'要確認':'—';}
+function outcomeLabel(value){return value===true?'Successful':value===false?'Review Required':'—';}
 function translatedClass(value){return classLabels[value]||value||'—';}
 function metric(label,value){return `<div class="result-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;}
 function difference(first,second){return first===null||first===undefined||second===null||second===undefined?null:Number(first)-Number(second);}
@@ -344,17 +344,17 @@ function renderHistoryDetail(record){
   const overview=record.overview||{};
   let cards=[];
   if(record.evaluation==='calibration') cards=[
-    ['判定',outcomeLabel(overview.success)],['選択振動レベル',formatNumber(overview.selected_vib_level,0)],['選択振動時間',`${formatNumber(overview.selected_vib_time,2)} 秒`],
-    ['吐出質量平均',`${formatNumber(overview.step_mass_mean,4)} g`],['吐出質量 標準偏差',`${formatNumber(overview.step_mass_std,4)} g`],['推定密度',`${formatNumber(overview.density_g_per_ml,4)} g/mL`]
+    ['Status',outcomeLabel(overview.success)],['Selected Vibration Level',formatNumber(overview.selected_vib_level,0)],['Selected Vibration Time',`${formatNumber(overview.selected_vib_time,2)} s`],
+    ['Mean Dispense Mass',`${formatNumber(overview.step_mass_mean,4)} g`],['Dispense Mass SD',`${formatNumber(overview.step_mass_std,4)} g`],['Estimated Density',`${formatNumber(overview.density_g_per_ml,4)} g/mL`]
   ];
-  if(record.evaluation==='calibration'&&overview.failure_reason) cards.push(['失敗理由',overview.failure_reason]);
+  if(record.evaluation==='calibration'&&overview.failure_reason) cards.push(['Failure Reason',overview.failure_reason]);
   if(record.evaluation==='hausner') cards=[
-    ['判定',outcomeLabel(overview.success)],['ハウスナー比',formatNumber(overview.hausner_ratio,4)],['流動性',translatedClass(overview.hausner_class)],
-    ['かさ密度 平均 ± SD',meanWithSpread(overview.bulk_density_mean,overview.bulk_density_stdev)],['タップ密度 平均 ± SD',meanWithSpread(overview.tapped_density_mean,overview.tapped_density_stdev)],['密度差',`${formatNumber(difference(overview.tapped_density_mean,overview.bulk_density_mean),4)} g/mL`]
+    ['Status',outcomeLabel(overview.success)],['Hausner Ratio',formatNumber(overview.hausner_ratio,4)],['Flowability',translatedClass(overview.hausner_class)],
+    ['Bulk Density Mean ± SD',meanWithSpread(overview.bulk_density_mean,overview.bulk_density_stdev)],['Tapped Density Mean ± SD',meanWithSpread(overview.tapped_density_mean,overview.tapped_density_stdev)],['Density Difference',`${formatNumber(difference(overview.tapped_density_mean,overview.bulk_density_mean),4)} g/mL`]
   ];
-  if(record.evaluation==='angle_of_repose') cards=[['判定',outcomeLabel(overview.success)],['安息角',`${formatNumber(overview.angle_deg,2)}°`],['流動性',translatedClass(overview.repose_class)]];
-  $('history-overview').innerHTML=cards.map(([label,value])=>metric(label,value)).join('')||'<div class="empty-state">概要データがありません。</div>';
-  $('history-context').textContent=`${record.dispenser_id} / ${record.material_name} / ${record.disk_id} ・ ${formatHistoryTimestamp(record.timestamp)}`;
+  if(record.evaluation==='angle_of_repose') cards=[['Status',outcomeLabel(overview.success)],['Angle of Repose',`${formatNumber(overview.angle_deg,2)}°`],['Flowability',translatedClass(overview.repose_class)]];
+  $('history-overview').innerHTML=cards.map(([label,value])=>metric(label,value)).join('')||'<div class="empty-state">No summary data is available.</div>';
+  $('history-context').textContent=`${record.dispenser_id} / ${record.material_name} / ${record.disk_id} · ${formatHistoryTimestamp(record.timestamp)}`;
   $('history-source').textContent=record.source_label;$('history-source').classList.add('visible');
   renderHistoryCharts(record);renderHistoryArtifacts(record);
   $('history-json').textContent=JSON.stringify(record.data||{},null,2);
@@ -380,20 +380,20 @@ function renderHistoryCharts(record){
   const data=record.data||{};let html='';
   if(record.evaluation==='calibration'){
     const level=data.level_results||[], time=data.time_results||[], stability=data.stability_results||[];
-    html+=chartCard('振動レベル別 平均吐出質量',[{name:'平均吐出質量 (g)',values:level.map(row=>row.mean_step_mass??average(row.per_step))}],level.length?`レベル: ${level.map(row=>row.level??'—').join(' / ')}`:'');
-    html+=chartCard('振動時間別 平均吐出質量',[{name:'平均吐出質量 (g)',values:time.map(row=>row.mean_step_mass??average(row.per_step))}],time.length?`時間 (秒): ${time.map(row=>row.vib_time??'—').join(' / ')}`:'');
-    stability.forEach((row,index)=>{html+=chartCard(`安定性確認${stability.length>1?` ${index+1}`:''}`,[{name:'1回ごとの吐出質量 (g)',values:row.per_step}],`振動レベル ${row.level??'—'} / ${row.vib_time??'—'} 秒`);});
+    html+=chartCard('Mean Dispense Mass by Vibration Level',[{name:'Mean dispense mass (g)',values:level.map(row=>row.mean_step_mass??average(row.per_step))}],level.length?`Levels: ${level.map(row=>row.level??'—').join(' / ')}`:'');
+    html+=chartCard('Mean Dispense Mass by Vibration Time',[{name:'Mean dispense mass (g)',values:time.map(row=>row.mean_step_mass??average(row.per_step))}],time.length?`Times (s): ${time.map(row=>row.vib_time??'—').join(' / ')}`:'');
+    stability.forEach((row,index)=>{html+=chartCard(`Stability Test${stability.length>1?` ${index+1}`:''}`,[{name:'Dispense mass per cycle (g)',values:row.per_step}],`Vibration level ${row.level??'—'} / ${row.vib_time??'—'} s`);});
   }else if(record.evaluation==='hausner'){
     const bulk=data.bulk_density||{}, tapped=data.tapped_density||{};
-    html+=chartCard('密度の繰返し測定',[{name:'かさ密度',values:bulk.densities},{name:'タップ密度',values:tapped.densities}],'単位: g/mL');
-    html+=chartCard('採取質量の繰返し測定',[{name:'かさ密度試験',values:bulk.masses},{name:'タップ密度試験',values:tapped.masses}],'単位: g');
+    html+=chartCard('Repeated Density Measurements',[{name:'Bulk density',values:bulk.densities},{name:'Tapped density',values:tapped.densities}],'Unit: g/mL');
+    html+=chartCard('Repeated Sample Mass Measurements',[{name:'Bulk density test',values:bulk.masses},{name:'Tapped density test',values:tapped.masses}],'Unit: g');
   }
-  $('history-charts').innerHTML=html||'<div class="empty-state">この結果にはグラフ用の数値データがありません。</div>';
+  $('history-charts').innerHTML=html||'<div class="empty-state">This result has no numerical data available for charts.</div>';
 }
 
 function renderHistoryArtifacts(record){
   const artifacts=record.artifacts||[], box=$('history-artifacts');
-  if(!artifacts.length){box.innerHTML=record.evaluation==='angle_of_repose'?'<div class="empty-state">保存画像がありません。</div>':'';return;}
+  if(!artifacts.length){box.innerHTML=record.evaluation==='angle_of_repose'?'<div class="empty-state">No saved images are available.</div>':'';return;}
   box.innerHTML=artifacts.map(item=>{const url=`/api/results/history/artifact/${encodeURIComponent(item.kind)}/${encodeURIComponent(item.run_id)}/${encodeURIComponent(item.filename)}`;return `<figure><a href="${url}" target="_blank" rel="noopener"><img loading="lazy" src="${url}" alt="${escapeHtml(item.label)}"></a><figcaption>${escapeHtml(item.label)}</figcaption></figure>`;}).join('');
 }
 
@@ -403,7 +403,7 @@ $('history-disk').addEventListener('change',rebuildHistoryFilters);
 $('history-record').addEventListener('change',event=>event.target.value&&loadHistoryDetail(event.target.value));
 $('refresh-history').addEventListener('click',()=>loadHistory(true));
 
-function connectWebSocket(){const ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws/run`);ws.onopen=()=>{$('conn-dot').className='dot ok';$('conn-label').textContent='サーバー接続済み';};ws.onmessage=event=>updateState(JSON.parse(event.data));ws.onclose=()=>{$('conn-dot').className='dot bad';$('conn-label').textContent='再接続中…';setTimeout(connectWebSocket,1500);};ws.onerror=()=>ws.close();}
+function connectWebSocket(){const ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws/run`);ws.onopen=()=>{$('conn-dot').className='dot ok';$('conn-label').textContent='Server Connected';};ws.onmessage=event=>updateState(JSON.parse(event.data));ws.onclose=()=>{$('conn-dot').className='dot bad';$('conn-label').textContent='Reconnecting…';setTimeout(connectWebSocket,1500);};ws.onerror=()=>ws.close();}
 
 buildNumericKeypad();buildTextKeyboard();
-Promise.all([api('/api/settings'),api('/api/runs/current'),api('/api/materials')]).then(([settingsValue,state,rows])=>{materialRows=rows;fillSettings(settingsValue);populateMaterialFilters();updateState(state);if(state.status==='running'){showPage('auto');showAutoView('run');}else if(state.result_pending){showPage('auto');showAutoView('result');}connectWebSocket();}).catch(error=>{toast(error.message,true);$('conn-dot').className='dot bad';$('conn-label').textContent='サーバー利用不可';setTimeout(()=>location.reload(),3000);});
+Promise.all([api('/api/settings'),api('/api/runs/current'),api('/api/materials')]).then(([settingsValue,state,rows])=>{materialRows=rows;fillSettings(settingsValue);populateMaterialFilters();updateState(state);if(state.status==='running'){showPage('auto');showAutoView('run');}else if(state.result_pending){showPage('auto');showAutoView('result');}connectWebSocket();}).catch(error=>{toast(error.message,true);$('conn-dot').className='dot bad';$('conn-label').textContent='Server Unavailable';setTimeout(()=>location.reload(),3000);});

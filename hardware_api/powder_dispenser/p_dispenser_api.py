@@ -9,7 +9,7 @@ import RPi.GPIO as GPIO
 
 # IR beam sensor input
 IR_SENSOR_PIN = 24  # Physical pin 18
-IR_ACTIVE_LEVEL = 1  # 黒が検出されたら1
+IR_ACTIVE_LEVEL = 1  # 1 when black is detected
 IR_INACTIVE_LEVEL = 0
 IR_DEBOUNCE_SEC = 0.001
 IR_POLL_INTERVAL_SEC = 0.001
