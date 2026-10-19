@@ -65,11 +65,42 @@ class ResultHistoryTests(unittest.TestCase):
     def test_scans_full_and_combined_single_results(self) -> None:
         records = scan_history(self.root)
         full = [record for record in records if record["source_kind"] == "all"]
-        self.assertEqual({record["evaluation"] for record in full}, {"calibration", "hausner", "angle_of_repose"})
-        combined = next(record for record in records if record["source_kind"] == "single" and record["evaluation"] == "hausner")
+        self.assertEqual(
+            {record["evaluation"] for record in full},
+            {"calibration", "bulk_density", "tapped_density", "hausner", "angle_of_repose"},
+        )
+        combined = next(record for record in records if record["source_kind"] == "combined" and record["evaluation"] == "hausner")
         self.assertAlmostEqual(combined["overview"]["hausner_ratio"], 1.25)
         self.assertEqual(combined["overview"]["hausner_class"], "Fair")
         self.assertEqual(len(combined["source_ids"]), 2)
+
+    def test_new_automated_result_exposes_tapped_density_without_hausner(self) -> None:
+        write_json(
+            self.root / "all" / "new-run" / "result.json",
+            {
+                "metadata": {
+                    "timestamp": "20260104_120000",
+                    "dispenser_id": "disp-02",
+                    "material_name": "Sample B",
+                    "disk_id": "D02",
+                },
+                "calibration": {"success": True, "level_results": []},
+                "tapped_density": {
+                    "success": True,
+                    "mean": 0.7,
+                    "stdev": 0.02,
+                    "densities": [0.68, 0.7, 0.72],
+                },
+                "angle_of_repose": {"success": True, "angle_deg": 31.0},
+            },
+        )
+        records = [
+            record
+            for record in scan_history(self.root)
+            if record["material_name"] == "Sample B"
+        ]
+        self.assertIn("tapped_density", {record["evaluation"] for record in records})
+        self.assertNotIn("hausner", {record["evaluation"] for record in records})
 
     def test_index_is_lightweight_and_detail_is_resolvable(self) -> None:
         rows = list_history(self.root)

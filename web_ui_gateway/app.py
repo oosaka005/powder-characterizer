@@ -15,6 +15,7 @@ from service.result_history import (
     get_history_detail,
     list_history,
 )
+from service.result_store import save_manual_bulk_density
 from web_ui_gateway.sila_client import PowderCharacterizerClient
 
 
@@ -35,6 +36,18 @@ class PreviewRequest(BaseModel):
 
 class SaveRequest(BaseModel):
     update_material_database: bool = False
+
+
+class BulkDensityReplicate(BaseModel):
+    mass_g: float = Field(gt=0)
+    volume_ml: float = Field(gt=0)
+
+
+class ManualBulkDensityRequest(BaseModel):
+    material_name: str = Field(min_length=1)
+    disk_id: str = Field(min_length=1)
+    replicates: list[BulkDensityReplicate] = Field(min_length=3, max_length=3)
+    update_material_database: bool = True
 
 
 @asynccontextmanager
@@ -180,6 +193,25 @@ def save(payload: SaveRequest, request: Request) -> dict[str, bool]:
 def discard(request: Request) -> dict[str, bool]:
     _run(lambda: _client(request).discard_results())
     return {"discarded": True}
+
+
+@app.post("/api/results/manual-bulk-density")
+def save_manual_bulk(payload: ManualBulkDensityRequest, request: Request) -> dict[str, Any]:
+    state = _run(lambda: _client(request).current_run())
+    if state.get("status") == "running" or state.get("result_pending"):
+        raise HTTPException(
+            status_code=409,
+            detail="Save or discard the current device result before entering manual bulk density.",
+        )
+    try:
+        return save_manual_bulk_density(
+            material_name=payload.material_name,
+            disk_id=payload.disk_id,
+            replicates=[replicate.model_dump() for replicate in payload.replicates],
+            update_material_database=payload.update_material_database,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/camera/preview")

@@ -58,6 +58,30 @@ class TouchWebUiTests(unittest.TestCase):
             self.assertIn(f'id="{control_id}"', self.html)
         self.assertIn("renderHistoryCharts", self.javascript)
         self.assertIn("renderHistoryArtifacts", self.javascript)
+        for evaluation in ("tapped_density", "bulk_density", "hausner"):
+            self.assertIn(f'data-value="{evaluation}"', self.html)
+
+    def test_manual_bulk_density_uses_three_touch_rows(self) -> None:
+        self.assertIn('id="bulk-density-dialog"', self.html)
+        self.assertEqual(self.html.count('data-field="mass_g"'), 3)
+        self.assertEqual(self.html.count('data-field="volume_ml"'), 3)
+        self.assertIn("/api/results/manual-bulk-density", self.javascript)
+
+    def test_material_database_uses_sorted_table(self) -> None:
+        self.assertIn('id="material-table-wrap"', self.html)
+        self.assertIn('class="material-table"', self.javascript)
+        self.assertIn("renderMaterialTable", self.javascript)
+        self.assertNotIn('class="material-card"', self.javascript)
+
+    def test_calibration_history_uses_saved_images_not_browser_charts(self) -> None:
+        calibration_branch = re.search(
+            r"if\(record\.evaluation==='calibration'\)\{(.*?)\}\s*else if",
+            self.javascript,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(calibration_branch)
+        self.assertIn("$('history-charts').replaceChildren()", calibration_branch.group(1))
+        self.assertNotIn("chartCard", calibration_branch.group(1))
 
     def test_high_consequence_actions_use_confirmation_dialog(self) -> None:
         self.assertIn("confirmAction('Abort Measurement'", self.javascript)

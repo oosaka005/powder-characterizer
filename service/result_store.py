@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import csv
+from copy import deepcopy
+from datetime import datetime
 import json
 import logging
 from pathlib import Path
+from statistics import mean, stdev
 from typing import Any, Iterable
 
 from service.settings_store import load_settings
@@ -236,13 +239,21 @@ def _write_density_raw_csv(
     path: Path,
     masses: list[float],
     densities: list[float],
+    volumes_ml: list[float] | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["index", "mass_g", "density_g_per_ml"])
-        for idx, (mass, density) in enumerate(zip(masses, densities), 1):
-            writer.writerow([idx, f"{mass:.6f}", f"{density:.6f}"])
+        writer.writerow(["index", "mass_g", "volume_ml", "density_g_per_ml"])
+        for idx, density in enumerate(densities, 1):
+            mass = masses[idx - 1] if idx <= len(masses) else None
+            volume = volumes_ml[idx - 1] if volumes_ml and idx <= len(volumes_ml) else None
+            writer.writerow([
+                idx,
+                f"{mass:.6f}" if mass is not None else "",
+                f"{volume:.6f}" if volume is not None else "",
+                f"{density:.6f}",
+            ])
 
 
 def _write_density_summary_csv(path: Path, density_data: dict[str, Any]) -> None:
@@ -333,9 +344,10 @@ def save_results(result: dict[str, Any]) -> None:
     timestamp = result_data["metadata"]["timestamp"]
     date_prefix = f"{timestamp[:8]}_"
     calibration = result_data["calibration"]
-    hausner = result_data["hausner"]
-    bulk_density = hausner["bulk_density"]
-    tapped_density = hausner["tapped_density"]
+    hausner = result_data.get("hausner")
+    tapped_density = result_data.get("tapped_density") or (hausner or {}).get("tapped_density")
+    if not isinstance(tapped_density, dict):
+        raise ValueError("Automated result does not contain tapped-density data.")
 
     _write_series_csv(
         calibration_dir / f"{date_prefix}level_exploration.csv",
@@ -353,27 +365,36 @@ def save_results(result: dict[str, Any]) -> None:
             filename = f"{date_prefix}stability_retry_{idx - 1}.csv"
         _write_series_csv(calibration_dir / filename, [stability_result])
 
-    _write_flowability_summary_csv(
-        flowability_dir / f"{date_prefix}flowability_summary.csv",
-        result_data,
-    )
-    _write_hausner_raw_csv(
-        flowability_dir / f"{date_prefix}hausner_raw.csv",
-        bulk_masses=bulk_density["masses"],
-        bulk_densities=bulk_density["densities"],
-        tapped_masses=tapped_density["masses"],
-        tapped_densities=tapped_density["densities"],
-    )
+    if isinstance(hausner, dict) and isinstance(hausner.get("bulk_density"), dict):
+        bulk_density = hausner["bulk_density"]
+        _write_flowability_summary_csv(
+            flowability_dir / f"{date_prefix}flowability_summary.csv",
+            result_data,
+        )
+        _write_hausner_raw_csv(
+            flowability_dir / f"{date_prefix}hausner_raw.csv",
+            bulk_masses=bulk_density["masses"],
+            bulk_densities=bulk_density["densities"],
+            tapped_masses=tapped_density["masses"],
+            tapped_densities=tapped_density["densities"],
+        )
+    else:
+        _write_density_raw_csv(
+            flowability_dir / f"{date_prefix}tapped_density_raw.csv",
+            tapped_density.get("masses", []),
+            tapped_density.get("densities", []),
+        )
+        _write_density_summary_csv(
+            flowability_dir / f"{date_prefix}tapped_density_summary.csv",
+            tapped_density,
+        )
     _write_artifacts(calibration_dir, flowability_dir, artifacts)
     if result.get("update_material_database"):
         calibration = result_data["calibration"]
-        hausner = result_data["hausner"]
         repose = result_data["angle_of_repose"]
-        bulk_density = hausner["bulk_density"]
-        tapped_density = hausner["tapped_density"]
         material = result_data["metadata"]["app_settings"]["material"]
         folder_path = f"all/{run_id}"
-        _update_material_database({
+        payload = {
             "dispenserID": "powder_dispenser",
             "mat_name": material["material_name"],
             "diskID": material["disk_id"],
@@ -383,22 +404,26 @@ def save_results(result: dict[str, Any]) -> None:
             "step_mass_mean": calibration["step_mass_mean"],
             "step_mass_std": calibration.get("step_mass_std"),
             "density_g_per_ml": calibration.get("density_g_per_ml"),
-            "bulk_density_mean": bulk_density["mean"] if bulk_density.get("success") else None,
-            "bulk_density_stdev": bulk_density["stdev"] if bulk_density.get("success") else None,
-            "bulk_density_success": bool(bulk_density.get("success")),
             "tapped_density_mean": tapped_density["mean"] if tapped_density.get("success") else None,
             "tapped_density_stdev": tapped_density["stdev"] if tapped_density.get("success") else None,
             "tapped_density_success": bool(tapped_density.get("success")),
-            "hausner_ratio": hausner["ratio"],
-            "hausner_class": hausner["class"],
             "angle_of_repose_deg": repose.get("angle_deg"),
             "repose_class": repose.get("class"),
-        }, sources_update={
+        }
+        sources = {
             "calibration": folder_path,
-            "bulk_density": folder_path,
             "tapped_density": folder_path,
             "angle_of_repose": folder_path if repose.get("angle_deg") is not None else None,
-        })
+        }
+        if isinstance(hausner, dict) and isinstance(hausner.get("bulk_density"), dict):
+            bulk_density = hausner["bulk_density"]
+            payload.update({
+                "bulk_density_mean": bulk_density["mean"] if bulk_density.get("success") else None,
+                "bulk_density_stdev": bulk_density["stdev"] if bulk_density.get("success") else None,
+                "bulk_density_success": bool(bulk_density.get("success")),
+            })
+            sources["bulk_density"] = folder_path
+        _update_material_database(payload, sources_update=sources)
 
 
 def save_single_test_result(result: dict[str, Any]) -> None:
@@ -471,6 +496,7 @@ def save_single_test_result(result: dict[str, Any]) -> None:
             run_dir / f"{date_prefix}bulk_density_raw.csv",
             density["masses"],
             density["densities"],
+            density.get("volumes_ml"),
         )
         _write_density_summary_csv(
             run_dir / f"{date_prefix}bulk_density_summary.csv",
@@ -511,3 +537,61 @@ def save_single_test_result(result: dict[str, Any]) -> None:
 def discard_results(result: dict[str, Any]) -> None:
     # No cleanup is needed right now because the result is kept in memory until save.
     _ = result
+
+
+def save_manual_bulk_density(
+    *,
+    material_name: str,
+    disk_id: str,
+    replicates: list[dict[str, float]],
+    update_material_database: bool = True,
+) -> dict[str, Any]:
+    """Validate, calculate, and save a manual n-replicate bulk-density result."""
+    if not material_name.strip():
+        raise ValueError("Material name is required.")
+    if len(replicates) < 1:
+        raise ValueError("At least one bulk-density replicate is required.")
+
+    masses: list[float] = []
+    volumes: list[float] = []
+    densities: list[float] = []
+    for index, replicate in enumerate(replicates, 1):
+        mass = float(replicate["mass_g"])
+        volume = float(replicate["volume_ml"])
+        if mass <= 0 or volume <= 0:
+            raise ValueError(f"Replicate {index} must have positive mass and volume values.")
+        masses.append(mass)
+        volumes.append(volume)
+        densities.append(mass / volume)
+
+    settings = deepcopy(load_settings())
+    if disk_id not in settings.get("disk_master", {}):
+        raise ValueError(f"Unknown Disk ID: {disk_id}")
+    settings["material"]["material_name"] = material_name.strip()
+    settings["material"]["disk_id"] = disk_id
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    density_data = {
+        "measurement_method": "manual_mass_volume",
+        "mean": mean(densities),
+        "stdev": stdev(densities) if len(densities) > 1 else 0.0,
+        "densities": densities,
+        "masses": masses,
+        "volumes_ml": volumes,
+        "success": True,
+    }
+    result = {
+        "metadata": {
+            "dispenser_id": "powder_dispenser",
+            "material_name": material_name.strip(),
+            "disk_id": disk_id,
+            "timestamp": timestamp,
+            "stage": "bulk_density",
+            "app_settings": settings,
+            "success": True,
+        },
+        "result_data": {"bulk_density": density_data},
+        "artifacts": {},
+        "update_material_database": bool(update_material_database),
+    }
+    save_single_test_result(result)
+    return {"metadata": result["metadata"], "bulk_density": density_data}

@@ -73,10 +73,6 @@
             <summary>Advanced Settings</summary>
             <div class="advanced-grid">
               <div><span class="field-label">Noise threshold (g)</span><div class="touch-stepper" data-min="0" data-max="1" data-step="0.001" data-decimals="3"><button class="stepper-minus">−</button><button id="noise_threshold" class="stepper-value">0.005</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">Bulk density repeats</span><div class="touch-stepper" data-min="1" data-max="20" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="bulk_repeats" class="stepper-value">7</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">Bulk density weak vibration</span><div class="touch-stepper" data-min="1" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="bulk_weak" class="stepper-value">1</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">Bulk density strong vibration</span><div class="touch-stepper" data-min="1" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="bulk_strong" class="stepper-value">4</button><button class="stepper-plus">＋</button></div></div>
-              <div><span class="field-label">Bulk density vibration time (s)</span><div class="touch-stepper" data-min="0" data-max="60" data-step="0.1" data-decimals="1"><button class="stepper-minus">−</button><button id="bulk_sec" class="stepper-value">1.0</button><button class="stepper-plus">＋</button></div></div>
               <div><span class="field-label">Tapped density repeats</span><div class="touch-stepper" data-min="1" data-max="20" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="tapped_repeats" class="stepper-value">7</button><button class="stepper-plus">＋</button></div></div>
               <div><span class="field-label">Tapped density vibration level</span><div class="touch-stepper" data-min="1" data-max="5" data-step="1" data-decimals="0"><button class="stepper-minus">−</button><button id="tapped_level" class="stepper-value">4</button><button class="stepper-plus">＋</button></div></div>
               <div><span class="field-label">Tapped density vibration time (s)</span><div class="touch-stepper" data-min="0" data-max="60" data-step="0.1" data-decimals="1"><button class="stepper-minus">−</button><button id="tapped_sec" class="stepper-value">3.0</button><button class="stepper-plus">＋</button></div></div>
@@ -133,7 +129,7 @@
       <div class="page-title-row"><div><h1>Single Test</h1><p>Select the test to run.</p></div></div>
       <div class="single-grid">
         <button class="test-button single" data-stage="calibration"><span class="test-icon">C</span><span><strong>Calibration</strong><small>Optimize vibration conditions</small></span></button>
-        <button class="test-button single" data-stage="bulk_density"><span class="test-icon">B</span><span><strong>Bulk Density</strong><small>Measure loose powder density</small></span></button>
+        <button class="test-button single" data-stage="bulk_density"><span class="test-icon">B</span><span><strong>Bulk Density</strong><small>Enter an n=3 manual measurement</small></span></button>
         <button class="test-button single" data-stage="tapped_density"><span class="test-icon">T</span><span><strong>Tapped Density</strong><small>Measure compacted powder density</small></span></button>
         <button class="test-button single" data-stage="angle_of_repose"><span class="test-icon">A</span><span><strong>Angle of Repose</strong><small>Analyze the powder pile image</small></span></button>
       </div>
@@ -150,8 +146,10 @@
         </div>
         <div class="history-evaluation-row">
           <span class="field-label">Evaluation result</span>
-          <div id="history-evaluation" class="choice-group three" data-selection="single">
+          <div id="history-evaluation" class="choice-group five" data-selection="single">
             <button class="choice-button selected" data-value="calibration">Vibration Optimization</button>
+            <button class="choice-button" data-value="tapped_density">Tapped Density</button>
+            <button class="choice-button" data-value="bulk_density">Bulk Density</button>
             <button class="choice-button" data-value="hausner">Hausner Ratio</button>
             <button class="choice-button" data-value="angle_of_repose">Angle of Repose</button>
           </div>
@@ -165,7 +163,7 @@
       </section>
 
       <details id="history-details" class="panel history-details">
-        <summary>View Detailed Charts and Images</summary>
+        <summary>View Detailed Results</summary>
         <div id="history-charts" class="history-charts"></div>
         <div id="history-artifacts" class="artifacts"></div>
         <details class="raw-details"><summary>Numerical Data (JSON)</summary><pre id="history-json" class="result-json">Select a result.</pre></details>
@@ -175,7 +173,7 @@
     <section id="page-materials" class="page">
       <div class="page-title-row"><div><h1>Material DB</h1><p>Select a material and Disk ID to review the registered values.</p></div><button class="secondary" id="refresh-materials">Refresh</button></div>
       <article class="panel filter-panel"><label>Material name<select id="material-filter"></select></label><label>Disk ID<select id="disk-filter"></select></label></article>
-      <div id="material-cards" class="material-cards"><div class="empty-state">Loading…</div></div>
+      <div id="material-table-wrap" class="material-table-wrap"><div class="empty-state">Loading…</div></div>
     </section>
   </main>
 
@@ -183,6 +181,20 @@
   <dialog id="numeric-dialog" class="touch-dialog"><form method="dialog"><h2 id="numeric-title">Enter a Number</h2><output id="numeric-display">0</output><div id="numeric-keypad" class="numeric-keypad"></div><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="numeric-ok" value="default" class="primary">Apply</button></div></form></dialog>
   <dialog id="text-dialog" class="touch-dialog text-dialog"><form method="dialog"><h2>New Material Name</h2><output id="text-display"></output><div id="text-keyboard" class="text-keyboard"></div><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="text-ok" value="default" class="primary">Apply</button></div></form></dialog>
   <dialog id="confirm-dialog" class="touch-dialog confirm-dialog"><form method="dialog"><h2 id="confirm-title">Confirmation</h2><p id="confirm-message"></p><div class="dialog-actions"><button value="cancel" class="secondary">Back</button><button id="confirm-ok" value="default" class="danger">Continue</button></div></form></dialog>
+  <dialog id="bulk-density-dialog" class="touch-dialog bulk-density-dialog">
+    <form method="dialog">
+      <h2>Manual Bulk Density</h2>
+      <p id="bulk-density-context" class="dialog-context"></p>
+      <div class="bulk-entry-table" role="table" aria-label="Bulk density replicates">
+        <div class="bulk-entry-header" role="row"><span>Replicate</span><span>Powder mass (g)</span><span>Untapped volume (mL)</span><span>Density (g/mL)</span></div>
+        <div class="bulk-entry-row" role="row"><strong>1</strong><button type="button" class="bulk-value-button" data-row="0" data-field="mass_g" data-numeric-title="Replicate 1 — Powder mass (g)">Enter</button><button type="button" class="bulk-value-button" data-row="0" data-field="volume_ml" data-numeric-title="Replicate 1 — Untapped volume (mL)">Enter</button><output id="bulk-density-0">—</output></div>
+        <div class="bulk-entry-row" role="row"><strong>2</strong><button type="button" class="bulk-value-button" data-row="1" data-field="mass_g" data-numeric-title="Replicate 2 — Powder mass (g)">Enter</button><button type="button" class="bulk-value-button" data-row="1" data-field="volume_ml" data-numeric-title="Replicate 2 — Untapped volume (mL)">Enter</button><output id="bulk-density-1">—</output></div>
+        <div class="bulk-entry-row" role="row"><strong>3</strong><button type="button" class="bulk-value-button" data-row="2" data-field="mass_g" data-numeric-title="Replicate 3 — Powder mass (g)">Enter</button><button type="button" class="bulk-value-button" data-row="2" data-field="volume_ml" data-numeric-title="Replicate 3 — Untapped volume (mL)">Enter</button><output id="bulk-density-2">—</output></div>
+      </div>
+      <div id="bulk-density-summary" class="result-summary compact-summary"><div class="empty-state">Enter mass and volume for all three replicates.</div></div>
+      <div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="save-bulk-density" type="button" class="primary">Save Measurement</button></div>
+    </form>
+  </dialog>
   <script src="/static/app.js" defer></script>
 </body>
 </html>

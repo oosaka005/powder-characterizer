@@ -15,11 +15,12 @@ from service.settings_store import load_settings
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DISPENSER_ID = "powder_dispenser"
-EVALUATIONS = {"calibration", "hausner", "angle_of_repose"}
+EVALUATIONS = {"calibration", "bulk_density", "tapped_density", "hausner", "angle_of_repose"}
 SOURCE_LABELS = {
     "all": "Automated Evaluation",
     "single": "Single Test",
     "old": "Legacy Format",
+    "combined": "Latest Saved Bulk + Tapped",
 }
 
 
@@ -237,6 +238,44 @@ def _hausner_record(
     )
 
 
+def _density_data(payload: dict[str, Any], stage: str) -> dict[str, Any] | None:
+    direct = payload.get(stage)
+    if isinstance(direct, dict):
+        return direct
+    hausner = payload.get("hausner")
+    nested = hausner.get(stage) if isinstance(hausner, dict) else None
+    return nested if isinstance(nested, dict) else None
+
+
+def _density_record(
+    payload: dict[str, Any], run_dir: Path, kind: str, stage: str
+) -> dict[str, Any] | None:
+    density = _density_data(payload, stage)
+    if density is None:
+        return None
+    dispenser, material, disk, timestamp = _metadata_values(payload)
+    label = "Bulk Density" if stage == "bulk_density" else "Tapped Density"
+    return _base_record(
+        evaluation=stage,
+        source_kind=kind,
+        source_ids=[run_dir.name],
+        dispenser_id=dispenser,
+        material_name=material,
+        disk_id=disk,
+        timestamp=timestamp,
+        overview={
+            "success": density.get("success"),
+            "mean": density.get("mean"),
+            "stdev": density.get("stdev"),
+            "replicates": len(density.get("densities") or []),
+            "measurement_method": density.get("measurement_method"),
+        },
+        data=density,
+        artifacts=[],
+        source_label=f"{SOURCE_LABELS[kind]} — {label}",
+    )
+
+
 def _repose_record(
     payload: dict[str, Any], run_dir: Path, kind: str
 ) -> dict[str, Any] | None:
@@ -370,42 +409,56 @@ def _legacy_records(run_dir: Path) -> list[dict[str, Any]]:
     return [record for record in (builder(payload, run_dir, "old") for builder, payload in zip(builders, payloads)) if record]
 
 
-def _single_hausner_records(single_payloads: list[tuple[Path, dict[str, Any]]]) -> list[dict[str, Any]]:
-    grouped: dict[tuple[str, str, str], dict[str, list[tuple[Path, dict[str, Any]]]]] = {}
-    for run_dir, payload in single_payloads:
-        metadata = payload.get("metadata", {})
-        stage = metadata.get("stage")
-        if stage not in {"bulk_density", "tapped_density"}:
-            continue
+def _combined_hausner_records(
+    density_sources: list[tuple[Path, dict[str, Any], str, str]],
+) -> list[dict[str, Any]]:
+    grouped: dict[
+        tuple[str, str, str],
+        dict[str, list[tuple[Path, dict[str, Any], str, str]]],
+    ] = {}
+    for run_dir, payload, kind, stage in density_sources:
         dispenser, material, disk, _ = _metadata_values(payload)
-        grouped.setdefault((dispenser, material, disk), {"bulk_density": [], "tapped_density": []})[stage].append((run_dir, payload))
+        density = _density_data(payload, stage) or {}
+        if not density.get("success") or _number(density.get("mean")) is None:
+            continue
+        grouped.setdefault(
+            (dispenser, material, disk),
+            {"bulk_density": [], "tapped_density": []},
+        )[stage].append((run_dir, payload, kind, stage))
 
     records: list[dict[str, Any]] = []
     for (dispenser, material, disk), stages in grouped.items():
         bulk_source = max(stages["bulk_density"], key=lambda item: _metadata_values(item[1])[3], default=None)
         tapped_source = max(stages["tapped_density"], key=lambda item: _metadata_values(item[1])[3], default=None)
-        if bulk_source is None and tapped_source is None:
+        if bulk_source is None or tapped_source is None:
             continue
-        bulk = bulk_source[1].get("bulk_density", {}) if bulk_source else {}
-        tapped = tapped_source[1].get("tapped_density", {}) if tapped_source else {}
+        if (
+            bulk_source[0] == tapped_source[0]
+            and bulk_source[2] == tapped_source[2]
+            and isinstance(bulk_source[1].get("hausner"), dict)
+        ):
+            # A legacy automated run already has its own immutable Hausner record.
+            continue
+        bulk = _density_data(bulk_source[1], "bulk_density") or {}
+        tapped = _density_data(tapped_source[1], "tapped_density") or {}
         bulk_mean = _number(bulk.get("mean"))
         tapped_mean = _number(tapped.get("mean"))
         ratio = tapped_mean / bulk_mean if bulk_mean and tapped_mean else None
         classification = _classify_hausner(ratio)
-        sources = [source for source in (bulk_source, tapped_source) if source]
-        source_ids = [source[0].name for source in sources]
+        sources = [bulk_source, tapped_source]
+        source_ids = [f"{source[2]}/{source[0].name}" for source in sources]
         timestamp = max((_metadata_values(source[1])[3] for source in sources), default="")
         data = {"bulk_density": bulk, "tapped_density": tapped, "ratio": ratio, "class": classification}
         records.append(
             _base_record(
                 evaluation="hausner",
-                source_kind="single",
+                source_kind="combined",
                 source_ids=source_ids,
                 dispenser_id=dispenser,
                 material_name=material,
                 disk_id=disk,
                 timestamp=timestamp,
-                source_label="Single Test (Latest Pair)",
+                source_label="Latest Saved Bulk + Tapped",
                 overview={
                     "success": bool(bulk.get("success")) and bool(tapped.get("success")),
                     "bulk_density_mean": bulk.get("mean"),
@@ -425,6 +478,7 @@ def _single_hausner_records(single_payloads: list[tuple[Path, dict[str, Any]]]) 
 def scan_history(log_root: Path | None = None) -> list[dict[str, Any]]:
     root = (log_root or _log_root()).resolve()
     records: list[dict[str, Any]] = []
+    density_sources: list[tuple[Path, dict[str, Any], str, str]] = []
     for run_dir in sorted((root / "all").glob("*")) if (root / "all").exists() else ():
         if not run_dir.is_dir():
             continue
@@ -435,22 +489,30 @@ def scan_history(log_root: Path | None = None) -> list[dict[str, Any]]:
             record = builder(payload, run_dir, "all")
             if record:
                 records.append(record)
+        for stage in ("bulk_density", "tapped_density"):
+            record = _density_record(payload, run_dir, "all", stage)
+            if record:
+                records.append(record)
+                density_sources.append((run_dir, payload, "all", stage))
 
-    single_payloads: list[tuple[Path, dict[str, Any]]] = []
     for run_dir in sorted((root / "single").glob("*")) if (root / "single").exists() else ():
         if not run_dir.is_dir():
             continue
         payload = _read_json(run_dir / "result.json")
         if payload is None:
             continue
-        single_payloads.append((run_dir, payload))
         stage = payload.get("metadata", {}).get("stage")
         builder = _calibration_record if stage == "calibration" else _repose_record if stage == "angle_of_repose" else None
         if builder:
             record = builder(payload, run_dir, "single")
             if record:
                 records.append(record)
-    records.extend(_single_hausner_records(single_payloads))
+        if stage in {"bulk_density", "tapped_density"}:
+            record = _density_record(payload, run_dir, "single", stage)
+            if record:
+                records.append(record)
+                density_sources.append((run_dir, payload, "single", stage))
+    records.extend(_combined_hausner_records(density_sources))
 
     for run_dir in sorted((root / "old").glob("*")) if (root / "old").exists() else ():
         if run_dir.is_dir():

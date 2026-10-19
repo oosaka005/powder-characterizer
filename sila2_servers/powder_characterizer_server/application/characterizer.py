@@ -136,9 +136,8 @@ class PowderCharacterizerApplication:
             ("starting", 0.02),
             ("priming", 0.05),
             ("calibration", 0.10),
-            ("bulk density", 0.50),
-            ("angle of repose", 0.70),
-            ("tapped density", 0.85),
+            ("angle of repose", 0.60),
+            ("tapped density", 0.80),
             ("completed", 1.0),
         )
         for marker, value in stages:

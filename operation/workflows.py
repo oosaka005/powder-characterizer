@@ -316,10 +316,7 @@ def run_automated_experiment(
     balance: BalanceInterface | None = None,
     camera: CameraInterface | None = None,
 ) -> dict[str, Any]:
-    from operation.powder_flow_api import (
-        classify_hausner,
-        prime_p_dispenser,
-    )
+    from operation.powder_flow_api import prime_p_dispenser
     from operation.local_devices import (
         create_local_balance,
         create_local_camera,
@@ -397,25 +394,11 @@ def run_automated_experiment(
             )
             raise
 
-        bulk_density_result = _run_bulk_density(
-            balance=balance_device,
-            powder_dispenser=dispenser,
-            material_name=material_name,
-            timestamp=timestamp,
-            disk_id=disk_id,
-            hooks=hooks,
-            cancel_token=cancel_token,
-        )
-        artifacts.update(bulk_density_result["artifacts"])
-        bulk_density_data = bulk_density_result["bulk_density"]
         stability_density = (
             calibration_data.get("density_g_per_ml")
             if calibration_data.get("success")
             else None
         )
-        _validate_density_against_stability(bulk_density_data, stability_density, "Bulk density", hooks)
-        mean_bulk = bulk_density_data["mean"]
-        bulk_success = bool(bulk_density_data["success"])
 
         repose_result = _run_repose(
             camera=camera_device,
@@ -441,28 +424,6 @@ def run_automated_experiment(
         artifacts.update(tapped_density_result["artifacts"])
         tapped_density_data = tapped_density_result["tapped_density"]
         _validate_density_against_stability(tapped_density_data, stability_density, "Tapped density", hooks)
-        mean_tapped = tapped_density_data["mean"]
-        tapped_success = bool(tapped_density_data["success"])
-        hausner_ratio = (
-            mean_tapped / mean_bulk
-            if (
-                bulk_success
-                and tapped_success
-                and mean_bulk is not None
-                and mean_tapped is not None
-                and mean_bulk
-            )
-            else None
-        )
-        hausner_class = (
-            classify_hausner(hausner_ratio) if hausner_ratio is not None else None
-        )
-        _log(
-            hooks,
-            "Hausner ratio: "
-            f"value={_format_optional(hausner_ratio, digits=4)}, "
-            f"class={hausner_class if hausner_class is not None else 'n/a'}",
-        )
     finally:
         balance_device.disconnect()
         if owns_dispenser:
@@ -480,19 +441,13 @@ def run_automated_experiment(
             "app_settings": settings,
             "success": {
                 "calibration": bool(calibration_data.get("success", False)),
-                "bulk_density": bool(bulk_density_data.get("success", False)),
                 "tapped_density": bool(tapped_density_data.get("success", False)),
                 "angle_of_repose": bool(repose_data.get("success", False)),
             },
         },
         "calibration": calibration_data,
         "angle_of_repose": repose_data,
-        "hausner": {
-            "ratio": hausner_ratio,
-            "class": hausner_class,
-            "bulk_density": bulk_density_data,
-            "tapped_density": tapped_density_data,
-        },
+        "tapped_density": tapped_density_data,
     }
 
     _log(hooks, f"Automated experiment completed: {run_id}")

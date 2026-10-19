@@ -10,6 +10,7 @@ let historyRequest = 0;
 let numericTarget = null;
 let textShift = false;
 let confirmResolver = null;
+let bulkDensityReplicates = Array.from({length:3},()=>({mass_g:null,volume_ml:null}));
 
 const $ = id => document.getElementById(id);
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -100,8 +101,8 @@ function buildNumericKeypad() {
 
 function openNumericKeypad(display) {
   numericTarget = display;
-  $('numeric-title').textContent = display.closest('div').previousElementSibling?.textContent || 'Enter a Number';
-  $('numeric-display').textContent = display.textContent;
+  $('numeric-title').textContent = display.dataset.numericTitle || display.closest('div')?.previousElementSibling?.textContent || 'Enter a Number';
+  $('numeric-display').textContent = Number.isFinite(Number(display.dataset.value)) ? display.dataset.value : '0';
   $('numeric-dialog').showModal();
 }
 
@@ -118,7 +119,13 @@ $('numeric-ok').addEventListener('click', event => {
   event.preventDefault();
   const value = Number($('numeric-display').textContent);
   if (!Number.isFinite(value) || !numericTarget) return;
-  setStepValue(numericTarget, value);
+  if(numericTarget.classList.contains('bulk-value-button')){
+    if(value<=0){toast('Enter a value greater than zero.',true);return;}
+    const row=Number(numericTarget.dataset.row),field=numericTarget.dataset.field;
+    bulkDensityReplicates[row][field]=value;
+    numericTarget.dataset.value=String(value);numericTarget.textContent=formatNumber(value,3);
+    renderBulkDensitySummary();
+  }else setStepValue(numericTarget, value);
   $('numeric-dialog').close('default');
 });
 
@@ -176,13 +183,12 @@ function populateMaterialOptions(rows, currentName='') {
 
 function fillSettings(value) {
   settings=value;
-  const material=value.material, calibration=value.calibration, bulk=value.bulk_density, tapped=value.tapped_density, manual=value.manual;
+  const material=value.material, calibration=value.calibration, tapped=value.tapped_density, manual=value.manual;
   $('disk_id').innerHTML=Object.keys(value.disk_master).map(id=>`<button class="choice-button" data-value="${escapeHtml(id)}">${escapeHtml(id)}</button>`).join('');
   populateMaterialOptions(materialRows, material.material_name);
   setSingleChoice('part_type',material.part_type); setSingleChoice('disk_id',material.disk_id);
   setMultiChoices('vib_levels',calibration.vib_levels); setMultiChoices('vib_times',calibration.vib_time_candidates);
   setStepValue('steps_per_level',calibration.steps_per_level); setStepValue('stability_steps',calibration.stability_steps); setStepValue('noise_threshold',calibration.noise_threshold_g);
-  setStepValue('bulk_repeats',bulk.repeats); setStepValue('bulk_weak',bulk.weak_vib_level); setStepValue('bulk_strong',bulk.strong_vib_level); setStepValue('bulk_sec',bulk.vib_sec_default);
   setStepValue('tapped_repeats',tapped.repeats); setStepValue('tapped_level',tapped.vib_level); setStepValue('tapped_sec',tapped.vib_sec);
   setStepValue('manual_level',manual.manual_vibration_level); setStepValue('manual_sec',manual.manual_vibration_sec); setStepValue('manual_count',manual.manual_dose_count); setToggle('manual_aug',manual.manual_use_aug);
   setSingleChoice('focus_mode',manual.manual_camera_focus_mode); setStepValue('lens_position',manual.manual_camera_lens_position);
@@ -195,7 +201,6 @@ function collectSettings() {
   if (!times.length) throw new Error('Select at least one vibration time.');
   Object.assign(result.material,{material_name:$('material_name').value,part_type:getSingleChoice('part_type'),disk_id:getSingleChoice('disk_id')});
   Object.assign(result.calibration,{vib_levels:levels,vib_time_candidates:times,steps_per_level:getStepValue('steps_per_level'),stability_steps:getStepValue('stability_steps'),noise_threshold_g:getStepValue('noise_threshold')});
-  Object.assign(result.bulk_density,{repeats:getStepValue('bulk_repeats'),weak_vib_level:getStepValue('bulk_weak'),strong_vib_level:getStepValue('bulk_strong'),vib_sec_default:getStepValue('bulk_sec')});
   Object.assign(result.tapped_density,{repeats:getStepValue('tapped_repeats'),vib_level:getStepValue('tapped_level'),vib_sec:getStepValue('tapped_sec')});
   Object.assign(result.manual,{manual_vibration_level:getStepValue('manual_level'),manual_vibration_sec:getStepValue('manual_sec'),manual_use_aug:getToggle('manual_aug'),manual_dose_count:getStepValue('manual_count'),manual_camera_focus_mode:getSingleChoice('focus_mode'),manual_camera_lens_position:getStepValue('lens_position')});
   return result;
@@ -229,14 +234,15 @@ function updateState(state) {
 function renderResultSummary(state) {
   const root=state.result; const box=$('result-summary');
   if (!root) { box.innerHTML='<div class="empty-state">No measurement result is available.</div>'; return; }
-  const data=root.result_data||root; const metadata=data.metadata||root.metadata||{}; const calibration=data.calibration; const hausner=data.hausner; const repose=data.angle_of_repose;
+  const data=root.result_data||root; const metadata=data.metadata||root.metadata||{}; const calibration=data.calibration; const hausner=data.hausner; const tapped=data.tapped_density||hausner?.tapped_density; const repose=data.angle_of_repose;
   const cards=[]; const material=metadata.app_settings?.material?.material_name||metadata.material_name;
   if(material) cards.push(['Material',material]);
   if(calibration) cards.push(['Selected Vibration Level',formatNumber(calibration.selected_vib_level,0)],['Mean Dispense Mass',`${formatNumber(calibration.step_mass_mean)} g`]);
-  if(hausner) cards.push(['Bulk Density',formatNumber(hausner.bulk_density?.mean)],['Tapped Density',formatNumber(hausner.tapped_density?.mean)],['Hausner Ratio',formatNumber(hausner.ratio)],['Flowability',hausner.class||'—']);
+  if(tapped) cards.push(['Tapped Density',`${formatNumber(tapped.mean,4)} g/mL`],['Tapped Density SD',`${formatNumber(tapped.stdev,4)} g/mL`],['Replicates',formatNumber(tapped.densities?.length,0)]);
+  if(hausner?.bulk_density) cards.push(['Bulk Density',`${formatNumber(hausner.bulk_density.mean,4)} g/mL`],['Hausner Ratio',formatNumber(hausner.ratio)],['Flowability',hausner.class||'—']);
   if(repose) cards.push(['Angle of Repose',`${formatNumber(repose.angle_deg,1)}°`],['Repose Classification',repose.class||'—']);
   const stage=metadata.stage; const stageData=stage?data[stage]:null;
-  if(stageData&&!calibration&&!hausner&&!repose){if(stageData.mean!==undefined)cards.push(['Mean',formatNumber(stageData.mean)],['Standard Deviation',formatNumber(stageData.stdev)]);if(stageData.angle_deg!==undefined)cards.push(['Angle of Repose',`${formatNumber(stageData.angle_deg,1)}°`],['Classification',stageData.class||'—']);}
+  if(stageData&&!calibration&&!tapped&&!repose){if(stageData.mean!==undefined)cards.push(['Mean',formatNumber(stageData.mean)],['Standard Deviation',formatNumber(stageData.stdev)]);if(stageData.angle_deg!==undefined)cards.push(['Angle of Repose',`${formatNumber(stageData.angle_deg,1)}°`],['Classification',stageData.class||'—']);}
   box.innerHTML=(cards.length?cards:[['Status','Review the result.']]).map(([label,value])=>`<div class="result-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
 }
 
@@ -246,7 +252,7 @@ function renderArtifacts(state) {
   box.innerHTML=entries.map(item=>{const filename=String(item.filename||'');const url=`/api/runs/${encodeURIComponent(state.run_id)}/artifacts/${encodeURIComponent(filename)}`;return `<figure><a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="${escapeHtml(filename)}"></a><figcaption>${escapeHtml(filename)}</figcaption></figure>`;}).join('');
 }
 
-$('save-result').addEventListener('click',()=>api('/api/results/save',{method:'POST',body:JSON.stringify({update_material_database:getToggle('update-db')})}).then(async()=>{toast('Measurement result saved.');setToggle('update-db',false);await loadMaterials();showAutoView('setup');}).catch(error=>toast(error.message,true)));
+$('save-result').addEventListener('click',()=>api('/api/results/save',{method:'POST',body:JSON.stringify({update_material_database:getToggle('update-db')})}).then(async()=>{toast('Measurement result saved.');setToggle('update-db',false);historyLoaded=false;await loadMaterials();showAutoView('setup');}).catch(error=>toast(error.message,true)));
 $('discard-result').addEventListener('click',async()=>{if(await confirmAction('Discard Result','This measurement result will not be saved. Discard it?','Discard Result')) api('/api/results/discard',{method:'POST'}).then(()=>{toast('Measurement result discarded.');showAutoView('setup');}).catch(error=>toast(error.message,true));});
 
 async function saveManualFields(){settings=collectSettings();await api('/api/settings',{method:'PUT',body:JSON.stringify(settings)});}
@@ -259,17 +265,57 @@ async function preview(url,body){const blob=await api(url,{method:'POST',body:bo
 $('camera-preview').addEventListener('click',async()=>{try{await saveManualFields();await preview('/api/camera/preview',{focus_mode:getSingleChoice('focus_mode'),lens_position:getStepValue('lens_position')});}catch(error){toast(error.message,true);}});
 $('repose-preview').addEventListener('click',()=>preview('/api/camera/repose-preview').catch(error=>toast(error.message,true)));
 
-document.querySelectorAll('.single').forEach(button=>button.addEventListener('click',()=>api('/api/runs/single/'+button.dataset.stage,{method:'POST'}).then(()=>{showPage('auto');showAutoView('run');}).catch(error=>toast(error.message,true))));
+function openBulkDensityEntry(){
+  if(!settings){toast('Settings are not available.',true);return;}
+  bulkDensityReplicates=Array.from({length:3},()=>({mass_g:null,volume_ml:null}));
+  document.querySelectorAll('.bulk-value-button').forEach(button=>{delete button.dataset.value;button.textContent='Enter';});
+  for(let index=0;index<3;index++)$('bulk-density-'+index).textContent='—';
+  $('bulk-density-context').textContent=`${settings.material.material_name} / ${settings.material.disk_id}`;
+  renderBulkDensitySummary();
+  $('bulk-density-dialog').showModal();
+}
+
+function bulkDensityValues(){return bulkDensityReplicates.map(row=>row.mass_g&&row.volume_ml?row.mass_g/row.volume_ml:null);}
+function sampleStdev(values){if(values.length<2)return 0;const avg=values.reduce((sum,value)=>sum+value,0)/values.length;return Math.sqrt(values.reduce((sum,value)=>sum+(value-avg)**2,0)/(values.length-1));}
+function renderBulkDensitySummary(){
+  const values=bulkDensityValues();
+  values.forEach((value,index)=>{$('bulk-density-'+index).textContent=value?formatNumber(value,4):'—';});
+  const complete=values.filter(value=>value!==null);
+  $('save-bulk-density').disabled=complete.length!==3;
+  if(complete.length!==3){$('bulk-density-summary').innerHTML='<div class="empty-state">Enter mass and volume for all three replicates.</div>';return;}
+  const avg=complete.reduce((sum,value)=>sum+value,0)/complete.length,sd=sampleStdev(complete),cv=avg?sd/avg*100:null;
+  $('bulk-density-summary').innerHTML=[['Mean',`${formatNumber(avg,4)} g/mL`],['SD',`${formatNumber(sd,4)} g/mL`],['CV',`${formatNumber(cv,2)} %`]].map(([label,value])=>metric(label,value)).join('');
+}
+
+document.querySelectorAll('.bulk-value-button').forEach(button=>button.addEventListener('click',()=>openNumericKeypad(button)));
+$('save-bulk-density').addEventListener('click',async()=>{
+  try{
+    const values=bulkDensityValues();
+    if(values.some(value=>value===null))throw new Error('Enter mass and volume for all three replicates.');
+    await api('/api/results/manual-bulk-density',{method:'POST',body:JSON.stringify({material_name:settings.material.material_name,disk_id:settings.material.disk_id,replicates:bulkDensityReplicates,update_material_database:true})});
+    $('bulk-density-dialog').close('default');historyLoaded=false;await loadMaterials();toast('Manual bulk-density result saved.');
+  }catch(error){toast(error.message,true);}
+});
+
+document.querySelectorAll('.single').forEach(button=>button.addEventListener('click',()=>{
+  if(button.dataset.stage==='bulk_density'){openBulkDensityEntry();return;}
+  api('/api/runs/single/'+button.dataset.stage,{method:'POST'}).then(()=>{showPage('auto');showAutoView('run');}).catch(error=>toast(error.message,true));
+}));
 $('single-dispense').addEventListener('click',()=>manualRun(1).catch(error=>toast(error.message,true)));
 $('single-capture').addEventListener('click',()=>preview('/api/camera/repose-preview').then(()=>showPage('manual')).catch(error=>toast(error.message,true)));
 
 function populateMaterialFilters(){const names=[...new Set(materialRows.map(row=>row.mat_name).filter(Boolean))].sort((a,b)=>a.localeCompare(b));$('material-filter').replaceChildren(new Option('All Materials',''),...names.map(name=>new Option(name,name)));updateDiskFilter();}
-function updateDiskFilter(){const material=$('material-filter').value;const disks=[...new Set(materialRows.filter(row=>!material||row.mat_name===material).map(row=>row.diskID).filter(Boolean))].sort();const current=$('disk-filter').value;$('disk-filter').replaceChildren(new Option('All Disk IDs',''),...disks.map(id=>new Option(id,id)));if(disks.includes(current))$('disk-filter').value=current;renderMaterialCards();}
-function renderMaterialCards(){const material=$('material-filter').value,disk=$('disk-filter').value;const rows=materialRows.filter(row=>(!material||row.mat_name===material)&&(!disk||row.diskID===disk));const fields=[['volume_ml','Volume (mL)'],['vib_level','Vibration Level'],['vib_time','Vibration Time (s)'],['step_mass_mean','Mean Dispense Mass (g)'],['density_g_per_ml','Density (g/mL)'],['bulk_density_mean','Bulk Density'],['tapped_density_mean','Tapped Density'],['hausner_ratio','Hausner Ratio'],['hausner_class','Flowability'],['angle_of_repose_deg','Angle of Repose (°)'],['repose_class','Repose Classification']];$('material-cards').innerHTML=rows.length?rows.map(row=>`<article class="material-card"><h2><span>${escapeHtml(row.mat_name)}</span><span class="disk-badge">${escapeHtml(row.diskID)}</span></h2><div class="material-values">${fields.map(([key,label])=>`<div class="material-value"><span>${escapeHtml(label)}</span><strong>${escapeHtml(formatNumber(row[key]))}</strong></div>`).join('')}</div></article>`).join(''):'<div class="empty-state">No matching Material DB records were found.</div>';}
+function updateDiskFilter(){const material=$('material-filter').value;const disks=[...new Set(materialRows.filter(row=>!material||row.mat_name===material).map(row=>row.diskID).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'en',{numeric:true}));const current=$('disk-filter').value;$('disk-filter').replaceChildren(new Option('All Disk IDs',''),...disks.map(id=>new Option(id,id)));if(disks.includes(current))$('disk-filter').value=current;renderMaterialTable();}
+function renderMaterialTable(){
+  const material=$('material-filter').value,disk=$('disk-filter').value;
+  const rows=materialRows.filter(row=>(!material||row.mat_name===material)&&(!disk||row.diskID===disk)).sort((a,b)=>String(a.mat_name||'').localeCompare(String(b.mat_name||''),'en',{sensitivity:'base',numeric:true})||String(a.diskID||'').localeCompare(String(b.diskID||''),'en',{numeric:true}));
+  const fields=[['mat_name','Material'],['diskID','Disk ID'],['volume_ml','Volume (mL)'],['vib_level','Vibration Level'],['vib_time','Vibration Time (s)'],['step_mass_mean','Mean Dispense Mass (g)'],['density_g_per_ml','Estimated Density (g/mL)'],['bulk_density_mean','Bulk Density (g/mL)'],['tapped_density_mean','Tapped Density (g/mL)'],['hausner_ratio','Hausner Ratio'],['hausner_class','Flowability'],['angle_of_repose_deg','Angle of Repose (°)'],['repose_class','Repose Classification']];
+  $('material-table-wrap').innerHTML=rows.length?`<table class="material-table"><thead><tr>${fields.map(([,label])=>`<th scope="col">${escapeHtml(label)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${fields.map(([key])=>`<td>${escapeHtml(key==='mat_name'||key==='diskID'?(row[key]??'—'):formatNumber(row[key]))}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'<div class="empty-state">No matching Material DB records were found.</div>';
+}
 async function loadMaterials(){try{const previousMaterial=$('material-filter').value;materialRows=await api('/api/materials');populateMaterialOptions(materialRows,settings?.material?.material_name||'');populateMaterialFilters();if([...$('material-filter').options].some(option=>option.value===previousMaterial))$('material-filter').value=previousMaterial;updateDiskFilter();}catch(error){toast(error.message,true);}}
-$('material-filter').addEventListener('change',updateDiskFilter);$('disk-filter').addEventListener('change',renderMaterialCards);$('refresh-materials').addEventListener('click',loadMaterials);
+$('material-filter').addEventListener('change',updateDiskFilter);$('disk-filter').addEventListener('change',renderMaterialTable);$('refresh-materials').addEventListener('click',loadMaterials);
 
-const evaluationLabels={calibration:'Vibration Optimization',hausner:'Hausner Ratio',angle_of_repose:'Angle of Repose'};
+const evaluationLabels={calibration:'Vibration Optimization',tapped_density:'Tapped Density',bulk_density:'Bulk Density',hausner:'Hausner Ratio',angle_of_repose:'Angle of Repose'};
 const classLabels={Excellent:'Excellent',Good:'Good',Fair:'Fair',Passable:'Passable',Poor:'Poor','Very poor':'Very Poor','Very, very poor':'Very, Very Poor'};
 
 function formatHistoryTimestamp(value) {
@@ -348,6 +394,10 @@ function renderHistoryDetail(record){
     ['Mean Dispense Mass',`${formatNumber(overview.step_mass_mean,4)} g`],['Dispense Mass SD',`${formatNumber(overview.step_mass_std,4)} g`],['Estimated Density',`${formatNumber(overview.density_g_per_ml,4)} g/mL`]
   ];
   if(record.evaluation==='calibration'&&overview.failure_reason) cards.push(['Failure Reason',overview.failure_reason]);
+  if(record.evaluation==='bulk_density'||record.evaluation==='tapped_density') cards=[
+    ['Status',outcomeLabel(overview.success)],['Mean Density',`${formatNumber(overview.mean,4)} g/mL`],['Density SD',`${formatNumber(overview.stdev,4)} g/mL`],
+    ['Replicates',formatNumber(overview.replicates,0)],['Method',overview.measurement_method==='manual_mass_volume'?'Manual mass / volume':'Device measurement']
+  ];
   if(record.evaluation==='hausner') cards=[
     ['Status',outcomeLabel(overview.success)],['Hausner Ratio',formatNumber(overview.hausner_ratio,4)],['Flowability',translatedClass(overview.hausner_class)],
     ['Bulk Density Mean ± SD',meanWithSpread(overview.bulk_density_mean,overview.bulk_density_stdev)],['Tapped Density Mean ± SD',meanWithSpread(overview.tapped_density_mean,overview.tapped_density_stdev)],['Density Difference',`${formatNumber(difference(overview.tapped_density_mean,overview.bulk_density_mean),4)} g/mL`]
@@ -379,10 +429,11 @@ function chartCard(title,series,note=''){
 function renderHistoryCharts(record){
   const data=record.data||{};let html='';
   if(record.evaluation==='calibration'){
-    const level=data.level_results||[], time=data.time_results||[], stability=data.stability_results||[];
-    html+=chartCard('Mean Dispense Mass by Vibration Level',[{name:'Mean dispense mass (g)',values:level.map(row=>row.mean_step_mass??average(row.per_step))}],level.length?`Levels: ${level.map(row=>row.level??'—').join(' / ')}`:'');
-    html+=chartCard('Mean Dispense Mass by Vibration Time',[{name:'Mean dispense mass (g)',values:time.map(row=>row.mean_step_mass??average(row.per_step))}],time.length?`Times (s): ${time.map(row=>row.vib_time??'—').join(' / ')}`:'');
-    stability.forEach((row,index)=>{html+=chartCard(`Stability Test${stability.length>1?` ${index+1}`:''}`,[{name:'Dispense mass per cycle (g)',values:row.per_step}],`Vibration level ${row.level??'—'} / ${row.vib_time??'—'} s`);});
+    $('history-charts').replaceChildren();
+    return;
+  }else if(record.evaluation==='bulk_density'||record.evaluation==='tapped_density'){
+    html+=chartCard('Repeated Density Measurements',[{name:evaluationLabels[record.evaluation],values:data.densities}],'Unit: g/mL');
+    html+=chartCard('Repeated Sample Mass Measurements',[{name:'Sample mass',values:data.masses}],'Unit: g');
   }else if(record.evaluation==='hausner'){
     const bulk=data.bulk_density||{}, tapped=data.tapped_density||{};
     html+=chartCard('Repeated Density Measurements',[{name:'Bulk density',values:bulk.densities},{name:'Tapped density',values:tapped.densities}],'Unit: g/mL');
