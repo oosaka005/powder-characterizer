@@ -72,6 +72,9 @@ class TouchWebUiTests(unittest.TestCase):
         self.assertIn('class="material-table"', self.javascript)
         self.assertIn("renderMaterialTable", self.javascript)
         self.assertNotIn('class="material-card"', self.javascript)
+        self.assertIn("overflow:scroll", self.css)
+        self.assertIn(".material-table-wrap::-webkit-scrollbar", self.css)
+        self.assertIn("width:20px; height:20px", self.css)
 
     def test_calibration_history_uses_saved_images_not_browser_charts(self) -> None:
         calibration_branch = re.search(
