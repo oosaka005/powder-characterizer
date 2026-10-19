@@ -10,6 +10,11 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from service.result_history import (
+    get_history_artifact,
+    get_history_detail,
+    list_history,
+)
 from web_ui_gateway.sila_client import PowderCharacterizerClient
 
 
@@ -90,6 +95,36 @@ def update_settings(settings: dict[str, Any], request: Request) -> dict[str, boo
 @app.get("/api/materials")
 def materials(request: Request) -> Any:
     return _run(lambda: _client(request).get_material_database())
+
+
+@app.get("/api/results/history")
+def result_history() -> list[dict[str, Any]]:
+    """Return a lightweight index of saved measurements.
+
+    The gateway and characterizer service run on the same controller, so history is
+    intentionally read from the shared, append-only result folders. Measurement
+    control still goes through SiLA.
+    """
+    return list_history()
+
+
+@app.get("/api/results/history/artifact/{kind}/{run_id}/{filename}")
+def result_history_artifact(kind: str, run_id: str, filename: str) -> FileResponse:
+    try:
+        path, media_type = get_history_artifact(kind, run_id, filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(path, media_type=media_type)
+
+
+@app.get("/api/results/history/{record_id}")
+def result_history_detail(record_id: str) -> dict[str, Any]:
+    try:
+        return get_history_detail(record_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/api/runs/current")

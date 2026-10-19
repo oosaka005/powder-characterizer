@@ -474,6 +474,9 @@ def run_automated_experiment(
         "metadata": {
             "run_id": run_id,
             "timestamp": timestamp,
+            "dispenser_id": "powder_dispenser",
+            "material_name": material_name,
+            "disk_id": disk_id,
             "app_settings": settings,
             "success": {
                 "calibration": bool(calibration_data.get("success", False)),
@@ -617,7 +620,9 @@ def run_single_test(
 
     return {
         "metadata": {
+            "dispenser_id": "powder_dispenser",
             "material_name": material_name,
+            "disk_id": disk_id,
             "timestamp": timestamp,
             "stage": stage_key,
             "app_settings": settings,

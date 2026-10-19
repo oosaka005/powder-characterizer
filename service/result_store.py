@@ -286,6 +286,11 @@ def save_calibration_failure_to_logs(
             "metadata": {
                 "run_id": run_id,
                 "timestamp": timestamp,
+                "dispenser_id": "powder_dispenser",
+                "material_name": material_name,
+                "disk_id": disk_id,
+                "calibration_failed": True,
+                "failure_reason": failure_reason,
                 "app_settings": settings,
                 "success": {
                     "calibration": False,
