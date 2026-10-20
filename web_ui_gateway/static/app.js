@@ -176,6 +176,10 @@ function confirmAction(title, message, confirmLabel='Continue', tone='danger') {
   return new Promise(resolve => { confirmResolver=resolve; });
 }
 $('confirm-dialog').addEventListener('close', () => { if (confirmResolver) { confirmResolver($('confirm-dialog').returnValue === 'default'); confirmResolver=null; } });
+$('reload-page').addEventListener('click',async()=>{
+  const approved=await confirmAction('Reload Screen','Reload the Web UI now? An active measurement will continue on the Raspberry Pi. Unsaved manual entries will be lost.','Reload','primary');
+  if(approved)location.reload();
+});
 
 function populateMaterialOptions(rows, currentName='') {
   const names = [...new Set(rows.map(row => row.mat_name).filter(Boolean))];

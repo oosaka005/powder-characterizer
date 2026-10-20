@@ -123,6 +123,11 @@ class TouchWebUiTests(unittest.TestCase):
         self.assertIn("figure img { display:block; width:100%; height:auto", self.css)
         self.assertNotIn('target="_blank"', self.javascript)
 
+    def test_kiosk_screen_has_touch_reload_control(self) -> None:
+        self.assertIn('id="reload-page"', self.html)
+        self.assertIn("confirmAction('Reload Screen'", self.javascript)
+        self.assertIn("location.reload()", self.javascript)
+
     def test_high_consequence_actions_use_confirmation_dialog(self) -> None:
         self.assertIn("confirmAction('Abort Measurement'", self.javascript)
         self.assertIn("confirmAction('Discard Result'", self.javascript)

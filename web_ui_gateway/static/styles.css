@@ -12,9 +12,11 @@ button { min-height:var(--touch); border:1px solid transparent; border-radius:10
 button:focus-visible,select:focus-visible,summary:focus-visible { outline:4px solid #e5b75e; outline-offset:2px; }
 button:active:not(:disabled) { transform:translateY(1px); filter:brightness(.94); }
 button:disabled { opacity:.42; cursor:not-allowed; }
-.app-header { height:54px; padding:8px 16px; display:flex; align-items:center; gap:12px; color:white; background:linear-gradient(110deg,#123e33,#1b7258); }
+.app-header { min-height:64px; padding:8px 16px; display:flex; align-items:center; gap:12px; color:white; background:linear-gradient(110deg,#123e33,#1b7258); }
 .brand { margin-right:auto; font-size:1.18rem; font-weight:800; letter-spacing:.01em; }
 .connection { display:flex; align-items:center; gap:8px; font-size:.82rem; font-weight:650; }
+.header-action { min-height:48px; padding:6px 12px; color:white; background:#ffffff1c; border-color:#ffffff66; }
+.header-action span { margin-right:4px; font-size:1.25rem; }
 .dot { width:13px; height:13px; flex:0 0 auto; border-radius:50%; background:var(--amber); box-shadow:0 0 0 3px #ffffff25; }
 .dot.ok { background:#78e1a8; } .dot.bad { background:#ff8585; }
 .main-nav { position:sticky; top:0; z-index:10; height:64px; display:grid; grid-template-columns:repeat(4,1fr); gap:5px; padding:5px 8px; background:#e4e3dc; border-bottom:1px solid var(--line); }
@@ -171,7 +173,7 @@ figure { width:100%; margin:0; padding:7px; border:1px solid var(--line); border
 
 @media (max-width:700px) {
   body { font-size:16px; }
-  .app-header { height:50px; padding:7px 10px; }.brand { font-size:1.05rem; }.connection { font-size:.72rem; }
+  .app-header { min-height:60px; padding:6px 9px; gap:7px; }.brand { font-size:1rem; }.connection { font-size:.7rem; }.header-action { min-height:46px; padding:5px 8px; font-size:.78rem; }
   .main-nav { height:62px; padding:4px; gap:3px; }.main-nav button { min-height:54px; padding:3px; flex-direction:column; gap:0; font-size:.73rem; }.nav-icon { line-height:1; }
   main { padding:9px 9px 90px; }
   .touch-grid,.setup-grid { grid-template-columns:1fr; }.panel.wide { grid-column:auto; }
