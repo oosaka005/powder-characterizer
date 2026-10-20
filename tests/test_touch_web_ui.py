@@ -16,14 +16,15 @@ class TouchWebUiTests(unittest.TestCase):
         cls.css = (STATIC / "styles.css").read_text(encoding="utf-8")
         cls.javascript = (STATIC / "app.js").read_text(encoding="utf-8")
 
-    def test_primary_navigation_has_five_touch_modes(self) -> None:
+    def test_primary_navigation_has_four_touch_modes(self) -> None:
         nav = re.search(
             r'<nav id="main-nav".*?</nav>', self.html, flags=re.DOTALL
         )
         self.assertIsNotNone(nav)
-        self.assertEqual(nav.group(0).count("data-page="), 5)
-        for page in ("auto", "manual", "single", "history", "materials"):
+        self.assertEqual(nav.group(0).count("data-page="), 4)
+        for page in ("auto", "manual", "history", "materials"):
             self.assertIn(f'data-page="{page}"', nav.group(0))
+        self.assertNotIn('data-page="single"', nav.group(0))
 
     def test_setup_uses_touch_controls_instead_of_direct_text_fields(self) -> None:
         self.assertNotRegex(self.html, r'<input[^>]+type="(?:text|number)"')
@@ -43,7 +44,8 @@ class TouchWebUiTests(unittest.TestCase):
         self.assertIn("--touch:56px", self.css)
         self.assertIn("min-height:var(--touch)", self.css)
         self.assertIn("@media (max-width:700px)", self.css)
-        self.assertIn("grid-template-columns:repeat(5,1fr)", self.css)
+        self.assertIn(".main-nav", self.css)
+        self.assertIn("grid-template-columns:repeat(4,1fr)", self.css)
 
     def test_history_view_is_touch_selectable_and_two_level(self) -> None:
         for control_id in (
@@ -62,7 +64,8 @@ class TouchWebUiTests(unittest.TestCase):
             self.assertIn(f'data-value="{evaluation}"', self.html)
 
     def test_manual_bulk_density_uses_three_touch_rows(self) -> None:
-        self.assertIn('id="bulk-density-dialog"', self.html)
+        self.assertIn('id="bulk-density-measurement"', self.html)
+        self.assertIn('id="review-bulk-density"', self.html)
         self.assertEqual(self.html.count('data-field="mass_g"'), 3)
         self.assertEqual(self.html.count('data-field="volume_ml"'), 3)
         self.assertIn("/api/results/manual-bulk-density", self.javascript)
@@ -77,10 +80,24 @@ class TouchWebUiTests(unittest.TestCase):
         self.assertIn("captureReposeConfirmationImage", self.javascript)
         self.assertIn("X-Repose-Preview-Id", self.javascript)
         self.assertIn("preview_id=${encodeURIComponent(previewId)}", self.javascript)
-        self.assertEqual(self.html.count('class="mode-indicator automated"'), 3)
+        self.assertEqual(self.html.count('class="mode-indicator automated"'), 4)
         self.assertEqual(self.html.count('class="mode-indicator manual"'), 1)
         self.assertNotIn("Enter an n=3 manual measurement", self.html)
         self.assertNotIn("Optimize vibration conditions", self.html)
+
+    def test_manual_dispense_reports_status_without_opening_measurement_view(self) -> None:
+        self.assertIn('id="manual-feedback"', self.html)
+        self.assertIn('id="manual-run-status"', self.html)
+        self.assertIn('id="manual-run-log"', self.html)
+        self.assertIn("renderManualOperationState", self.javascript)
+        manual_run = re.search(
+            r"async function manualRun\(count=null\)\{(.*?)\n\}",
+            self.javascript,
+            flags=re.DOTALL,
+        )
+        self.assertIsNotNone(manual_run)
+        self.assertNotIn("showPage('auto')", manual_run.group(1))
+        self.assertNotIn("showAutoView('run')", manual_run.group(1))
 
     def test_material_database_uses_sorted_table(self) -> None:
         self.assertIn('id="material-table-wrap"', self.html)

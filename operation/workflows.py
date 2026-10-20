@@ -154,6 +154,7 @@ def run_manual_experiment(
             vib_runner = dispenser.vibrate
         requested_steps = max(0, int(dose_count))
         succeeded_steps = 0
+        failed_step: dict[str, Any] | None = None
 
         if requested_steps == 0:
             _ensure_not_cancelled(cancel_token)
@@ -165,13 +166,27 @@ def run_manual_experiment(
                 if not is_step_only:
                     vib_runner(vib_level, vib_seconds)
                 _ensure_not_cancelled(cancel_token)
-                if not bool(dispenser.index_chamber()["success"]):
+                step_result = dispenser.index_chamber()
+                if not bool(step_result["success"]):
+                    failed_step = {
+                        "attempt": succeeded_steps + 1,
+                        "stop_reason": str(step_result.get("stop_reason") or "unknown"),
+                        "elapsed_sec": step_result.get("elapsed_sec"),
+                    }
+                    _log(
+                        hooks,
+                        "Manual dispense stopped before completion: "
+                        f"step={failed_step['attempt']}, "
+                        f"rotation_motor_reason={failed_step['stop_reason']}",
+                    )
                     break
                 succeeded_steps += 1
 
         return {
+            "success": failed_step is None and succeeded_steps == requested_steps,
             "requested_steps": requested_steps,
             "succeeded_steps": succeeded_steps,
+            "failed_step": failed_step,
             "vib_level": vib_level,
             "vib_seconds": vib_seconds,
             "use_aug": use_aug,

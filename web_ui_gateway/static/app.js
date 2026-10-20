@@ -13,6 +13,7 @@ let numericTarget = null;
 let textShift = false;
 let confirmResolver = null;
 let bulkDensityReplicates = Array.from({length:3},()=>({mass_g:null,volume_ml:null}));
+let pendingManualBulk = null;
 
 const $ = id => document.getElementById(id);
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -210,27 +211,55 @@ function collectSettings() {
 }
 
 async function saveSettings() { settings=collectSettings(); await api('/api/settings',{method:'PUT',body:JSON.stringify(settings)}); toast('Evaluation settings saved.'); }
-async function startAutomated() { await api('/api/runs/automated',{method:'POST'}); showPage('auto'); showAutoView('run'); toast('Automated evaluation started.'); }
-async function retryAutomated() { await api('/api/results/discard',{method:'POST'}); await startAutomated(); }
+function setMeasurementMode(mode){document.querySelectorAll('.measurement-mode').forEach(element=>element.classList.toggle('active',element.id===`${mode}-measurement`));}
+async function startAutomated() { setMeasurementMode('automated');await api('/api/runs/automated',{method:'POST'});showPage('auto');showAutoView('run');toast('Full evaluation started.'); }
 
 $('save-settings').addEventListener('click',()=>saveSettings().catch(error=>toast(error.message,true)));
-$('save-start').addEventListener('click',async()=>{try{await saveSettings();await startAutomated();}catch(error){toast(error.message,true);}});
-$('start-run').addEventListener('click',()=>startAutomated().catch(error=>toast(error.message,true)));
-$('retry-run').addEventListener('click',async()=>{if(await confirmAction('Run Again','The pending result will be discarded before starting another measurement with the same settings.','Run Again')) retryAutomated().catch(error=>toast(error.message,true));});
+$('save-continue').addEventListener('click',async()=>{try{await saveSettings();showAutoView('select');}catch(error){toast(error.message,true);}});
+$('back-to-selection').addEventListener('click',()=>showAutoView('select'));
 $('abort-run').addEventListener('click',async()=>{if(await confirmAction('Abort Measurement','Abort the measurement currently in progress?','Abort Measurement')) api('/api/runs/abort',{method:'POST'}).then(()=>toast('Measurement abort requested.')).catch(error=>toast(error.message,true));});
 
 const statusLabels={idle:'Idle',running:'Running',completed:'Completed',failed:'Error',aborted:'Aborted',gateway_error:'Connection Error'};
 const stageLabels={calibration:'Calibration',bulk_density:'Bulk Density',tapped_density:'Tapped Density',angle_of_repose:'Angle of Repose',manual:'Manual Operation'};
 const formatNumber=(value,digits=3)=>value===null||value===undefined||value===''?'—':Number.isFinite(Number(value))?Number(value).toFixed(digits).replace(/\.?0+$/,''):String(value);
 
+function renderManualOperationState(state){
+  if(state.operation!=='manual')return;
+  const feedback=$('manual-feedback'),running=state.status==='running',result=state.result||{};
+  const requested=Number(result.requested_steps||0),succeeded=Number(result.succeeded_steps||0);
+  const stopped=result.success===false||requested>succeeded;
+  feedback.classList.toggle('running',running);
+  feedback.classList.toggle('success',state.status==='completed'&&!stopped);
+  feedback.classList.toggle('error',state.status==='failed'||state.status==='aborted'||stopped);
+  $('manual-run').disabled=running;
+  $('dispense-once').disabled=running;
+  $('manual-run-status').textContent=running?'Running':stopped?'Stopped':statusLabels[state.status]||'Ready';
+  if(running){
+    $('manual-run-summary').textContent='Manual dispensing is in progress.';
+  }else if(state.status==='failed'||state.status==='aborted'){
+    $('manual-run-summary').textContent=state.error||'The manual dispense did not complete.';
+  }else if(stopped){
+    const reason=result.failed_step?.stop_reason;
+    $('manual-run-summary').textContent=`Stopped after ${succeeded} of ${requested} dispenses.${reason?` Rotation motor: ${reason}.`:' Check the rotation motor and chamber sensor.'}`;
+  }else if(state.status==='completed'&&requested>0){
+    $('manual-run-summary').textContent=`Completed successfully: ${succeeded} of ${requested} dispenses.`;
+  }else if(state.status==='completed'){
+    $('manual-run-summary').textContent='Manual vibration completed successfully.';
+  }
+  $('manual-run-log').textContent=(state.logs||[]).join('\n')||state.error||'Waiting for a manual operation.';
+}
+
 function updateState(state) {
   const previousPending=Boolean(latestState?.result_pending); latestState=state;
   $('run-status').textContent=statusLabels[state.status]||state.status||'Unknown'; $('run-stage').textContent=stageLabels[state.stage]||state.stage||'—'; $('run-elapsed').textContent=`${Number(state.elapsed_sec||0).toFixed(1)} s`; $('run-progress').value=state.progress||0;
-  $('run-log').textContent=(state.logs||[]).join('\n')||'Waiting for a measurement.'; $('result-json').textContent=state.result?JSON.stringify(state.result,null,2):state.error||'No measurement result is available.';
+  $('run-log').textContent=(state.logs||[]).join('\n')||'Waiting for a measurement.';
+  if(!pendingManualBulk)$('result-json').textContent=state.result?JSON.stringify(state.result,null,2):state.error||'No measurement result is available.';
   const running=state.status==='running', pending=Boolean(state.result_pending);
-  $('start-run').disabled=running||pending; $('retry-run').disabled=running||!pending; $('abort-run').disabled=!running; $('save-result').disabled=!pending; $('discard-result').disabled=!pending;
+  $('back-to-selection').disabled=running; $('abort-run').disabled=!running; $('save-result').disabled=!pending&&!pendingManualBulk; $('discard-result').disabled=!pending&&!pendingManualBulk;
+  renderManualOperationState(state);
+  if(pendingManualBulk)return;
   renderResultSummary(state); renderArtifacts(state);
-  if (running && !previousPending) { showPage('auto'); showAutoView('run'); }
+  if (running && state.operation!=='manual' && !previousPending) { setMeasurementMode('automated');showPage('auto');showAutoView('run'); }
   if (pending && !previousPending) { showPage('auto'); showAutoView('result'); }
 }
 
@@ -255,11 +284,37 @@ function renderArtifacts(state) {
   box.innerHTML=entries.map(item=>{const filename=String(item.filename||'');const url=`/api/runs/${encodeURIComponent(state.run_id)}/artifacts/${encodeURIComponent(filename)}`;return `<figure><a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="${escapeHtml(filename)}"></a><figcaption>${escapeHtml(filename)}</figcaption></figure>`;}).join('');
 }
 
-$('save-result').addEventListener('click',()=>api('/api/results/save',{method:'POST',body:JSON.stringify({update_material_database:getToggle('update-db')})}).then(async()=>{toast('Measurement result saved.');setToggle('update-db',false);historyLoaded=false;await loadMaterials();showAutoView('setup');}).catch(error=>toast(error.message,true)));
-$('discard-result').addEventListener('click',async()=>{if(await confirmAction('Discard Result','This measurement result will not be saved. Discard it?','Discard Result')) api('/api/results/discard',{method:'POST'}).then(()=>{toast('Measurement result discarded.');showAutoView('setup');}).catch(error=>toast(error.message,true));});
+async function saveCurrentResult(){
+  if(pendingManualBulk){
+    await api('/api/results/manual-bulk-density',{method:'POST',body:JSON.stringify({...pendingManualBulk,update_material_database:getToggle('update-db')})});
+    pendingManualBulk=null;historyLoaded=false;await loadMaterials();toast('Manual bulk-density result saved.');
+  }else{
+    await api('/api/results/save',{method:'POST',body:JSON.stringify({update_material_database:getToggle('update-db')})});
+    historyLoaded=false;await loadMaterials();toast('Measurement result saved.');
+  }
+  setToggle('update-db',false);showAutoView('select');
+}
+
+$('save-result').addEventListener('click',()=>saveCurrentResult().catch(error=>toast(error.message,true)));
+$('discard-result').addEventListener('click',async()=>{
+  if(!await confirmAction('Discard Result','This measurement result will not be saved. Discard it?','Discard Result'))return;
+  if(pendingManualBulk){pendingManualBulk=null;setToggle('update-db',false);updateState(latestState);showAutoView('select');toast('Manual bulk-density entry discarded.');return;}
+  api('/api/results/discard',{method:'POST'}).then(()=>{toast('Measurement result discarded.');showAutoView('select');}).catch(error=>toast(error.message,true));
+});
 
 async function saveManualFields(){settings=collectSettings();await api('/api/settings',{method:'PUT',body:JSON.stringify(settings)});}
-async function manualRun(count=null){await saveManualFields();const payload={vibration_level:getStepValue('manual_level'),vibration_seconds:getStepValue('manual_sec'),dose_count:count??getStepValue('manual_count'),use_auger:getToggle('manual_aug')};await api('/api/runs/manual',{method:'POST',body:JSON.stringify(payload)});showPage('auto');showAutoView('run');}
+async function manualRun(count=null){
+  await saveManualFields();
+  const doseCount=count??getStepValue('manual_count');
+  const payload={vibration_level:getStepValue('manual_level'),vibration_seconds:getStepValue('manual_sec'),dose_count:doseCount,use_auger:getToggle('manual_aug')};
+  $('manual-feedback').className='manual-feedback running';
+  $('manual-run-status').textContent='Starting';
+  $('manual-run-summary').textContent=`Starting ${doseCount} manual dispense${doseCount===1?'':'s'}…`;
+  $('manual-run-log').textContent='Sending the manual operation to the dispenser…';
+  $('manual-run').disabled=true;$('dispense-once').disabled=true;
+  try{await api('/api/runs/manual',{method:'POST',body:JSON.stringify(payload)});}
+  catch(error){$('manual-feedback').className='manual-feedback error';$('manual-run-status').textContent='Error';$('manual-run-summary').textContent=error.message;$('manual-run-log').textContent=error.message;$('manual-run').disabled=false;$('dispense-once').disabled=false;throw error;}
+}
 $('manual-run').addEventListener('click',()=>manualRun().catch(error=>toast(error.message,true)));
 $('dispense-once').addEventListener('click',()=>manualRun(1).catch(error=>toast(error.message,true)));
 $('clear-clog').addEventListener('click',async()=>{if(await confirmAction('Clear Clog','Run the dispenser clog-clearing operation?','Clear Clog')) api('/api/runs/clear-clog',{method:'POST'}).then(()=>toast('Clog-clearing operation completed.')).catch(error=>toast(error.message,true));});
@@ -270,12 +325,13 @@ $('repose-preview').addEventListener('click',()=>preview('/api/camera/repose-pre
 
 function openBulkDensityEntry(){
   if(!settings){toast('Settings are not available.',true);return;}
+  pendingManualBulk=null;
   bulkDensityReplicates=Array.from({length:3},()=>({mass_g:null,volume_ml:null}));
   document.querySelectorAll('.bulk-value-button').forEach(button=>{delete button.dataset.value;button.textContent='Enter';});
   for(let index=0;index<3;index++)$('bulk-density-'+index).textContent='—';
-  $('bulk-density-context').textContent=`${settings.material.material_name} / ${settings.material.disk_id}`;
+  $('bulk-density-context').textContent=`Material: ${settings.material.material_name}\nDisk ID: ${settings.material.disk_id}`;
   renderBulkDensitySummary();
-  $('bulk-density-dialog').showModal();
+  setMeasurementMode('bulk-density');showPage('auto');showAutoView('run');
 }
 
 function bulkDensityValues(){return bulkDensityReplicates.map(row=>row.mass_g&&row.volume_ml?row.mass_g/row.volume_ml:null);}
@@ -284,20 +340,23 @@ function renderBulkDensitySummary(){
   const values=bulkDensityValues();
   values.forEach((value,index)=>{$('bulk-density-'+index).textContent=value?formatNumber(value,4):'—';});
   const complete=values.filter(value=>value!==null);
-  $('save-bulk-density').disabled=complete.length!==3;
+  $('review-bulk-density').disabled=complete.length!==3;
   if(complete.length!==3){$('bulk-density-summary').innerHTML='<div class="empty-state">Enter mass and volume for all three replicates.</div>';return;}
   const avg=complete.reduce((sum,value)=>sum+value,0)/complete.length,sd=sampleStdev(complete),cv=avg?sd/avg*100:null;
   $('bulk-density-summary').innerHTML=[['Mean',`${formatNumber(avg,4)} g/mL`],['SD',`${formatNumber(sd,4)} g/mL`],['CV',`${formatNumber(cv,2)} %`]].map(([label,value])=>metric(label,value)).join('');
 }
 
 document.querySelectorAll('.bulk-value-button').forEach(button=>button.addEventListener('click',()=>openNumericKeypad(button)));
-$('save-bulk-density').addEventListener('click',async()=>{
-  try{
-    const values=bulkDensityValues();
-    if(values.some(value=>value===null))throw new Error('Enter mass and volume for all three replicates.');
-    await api('/api/results/manual-bulk-density',{method:'POST',body:JSON.stringify({material_name:settings.material.material_name,disk_id:settings.material.disk_id,replicates:bulkDensityReplicates,update_material_database:true})});
-    $('bulk-density-dialog').close('default');historyLoaded=false;await loadMaterials();toast('Manual bulk-density result saved.');
-  }catch(error){toast(error.message,true);}
+$('cancel-bulk-density').addEventListener('click',()=>{pendingManualBulk=null;showAutoView('select');});
+$('review-bulk-density').addEventListener('click',()=>{
+  const values=bulkDensityValues();
+  if(values.some(value=>value===null)){toast('Enter mass and volume for all three replicates.',true);return;}
+  const mean=values.reduce((sum,value)=>sum+value,0)/values.length,stdev=sampleStdev(values),cv=mean?stdev/mean*100:null;
+  pendingManualBulk={material_name:settings.material.material_name,disk_id:settings.material.disk_id,replicates:structuredClone(bulkDensityReplicates)};
+  $('result-summary').innerHTML=[['Material',settings.material.material_name],['Disk ID',settings.material.disk_id],['Mean Bulk Density',`${formatNumber(mean,4)} g/mL`],['Bulk Density SD',`${formatNumber(stdev,4)} g/mL`],['CV',`${formatNumber(cv,2)} %`],['Replicates','3']].map(([label,value])=>`<div class="result-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('');
+  $('artifacts').textContent='No images are available for manual bulk-density measurements.';
+  $('result-json').textContent=JSON.stringify({measurement:'bulk_density',source:'manual',material_name:settings.material.material_name,disk_id:settings.material.disk_id,replicates:bulkDensityReplicates,densities:values,mean,stdev,cv_percent:cv},null,2);
+  setToggle('update-db',true);$('save-result').disabled=false;$('discard-result').disabled=false;showAutoView('result');
 });
 
 const singleTestConfirmations={
@@ -339,7 +398,7 @@ $('analyze-repose-image').addEventListener('click',async()=>{
   $('analyze-repose-image').disabled=true;
   try{
     await api(`/api/runs/single/angle_of_repose?preview_id=${encodeURIComponent(previewId)}`,{method:'POST'});
-    $('repose-confirm-dialog').close('default');showPage('auto');showAutoView('run');
+    $('repose-confirm-dialog').close('default');setMeasurementMode('automated');showPage('auto');showAutoView('run');
   }catch(error){$('analyze-repose-image').disabled=false;toast(error.message,true);}
 });
 
@@ -354,13 +413,18 @@ async function confirmSingleTest(stage){
   if(stage==='bulk_density'){openBulkDensityEntry();return;}
   try{
     await api('/api/runs/single/'+stage,{method:'POST'});
-    showPage('auto');showAutoView('run');
+    setMeasurementMode('automated');showPage('auto');showAutoView('run');
   }catch(error){toast(error.message,true);}
 }
 
-document.querySelectorAll('.single').forEach(button=>button.addEventListener('click',()=>confirmSingleTest(button.dataset.stage)));
-$('single-dispense').addEventListener('click',()=>manualRun(1).catch(error=>toast(error.message,true)));
-$('single-capture').addEventListener('click',()=>preview('/api/camera/repose-preview').then(()=>showPage('manual')).catch(error=>toast(error.message,true)));
+async function confirmFullEvaluation(){
+  const material=settings?.material?.material_name||'Not selected',disk=settings?.material?.disk_id||'Not selected';
+  const approved=await confirmAction('Confirm — Full Evaluation',`Material: ${material}\nDisk ID: ${disk}\n\nSequence: Calibration → Angle of Repose → Tapped Density\n\nHas the material priming been completed?`,'Yes, Start','primary');
+  if(!approved)return;
+  try{await startAutomated();}catch(error){toast(error.message,true);}
+}
+
+document.querySelectorAll('.evaluation-choice').forEach(button=>button.addEventListener('click',()=>button.dataset.evaluation==='automated'?confirmFullEvaluation():confirmSingleTest(button.dataset.evaluation)));
 
 function populateMaterialFilters(){const names=[...new Set(materialRows.map(row=>row.mat_name).filter(Boolean))].sort((a,b)=>a.localeCompare(b));$('material-filter').replaceChildren(new Option('All Materials',''),...names.map(name=>new Option(name,name)));updateDiskFilter();}
 function updateDiskFilter(){const material=$('material-filter').value;const disks=[...new Set(materialRows.filter(row=>!material||row.mat_name===material).map(row=>row.diskID).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'en',{numeric:true}));const current=$('disk-filter').value;$('disk-filter').replaceChildren(new Option('All Disk IDs',''),...disks.map(id=>new Option(id,id)));if(disks.includes(current))$('disk-filter').value=current;renderMaterialTable();}
@@ -515,4 +579,4 @@ $('refresh-history').addEventListener('click',()=>loadHistory(true));
 function connectWebSocket(){const ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws/run`);ws.onopen=()=>{$('conn-dot').className='dot ok';$('conn-label').textContent='Server Connected';};ws.onmessage=event=>updateState(JSON.parse(event.data));ws.onclose=()=>{$('conn-dot').className='dot bad';$('conn-label').textContent='Reconnecting…';setTimeout(connectWebSocket,1500);};ws.onerror=()=>ws.close();}
 
 buildNumericKeypad();buildTextKeyboard();
-Promise.all([api('/api/settings'),api('/api/runs/current'),api('/api/materials')]).then(([settingsValue,state,rows])=>{materialRows=rows;fillSettings(settingsValue);populateMaterialFilters();updateState(state);if(state.status==='running'){showPage('auto');showAutoView('run');}else if(state.result_pending){showPage('auto');showAutoView('result');}connectWebSocket();}).catch(error=>{toast(error.message,true);$('conn-dot').className='dot bad';$('conn-label').textContent='Server Unavailable';setTimeout(()=>location.reload(),3000);});
+Promise.all([api('/api/settings'),api('/api/runs/current'),api('/api/materials')]).then(([settingsValue,state,rows])=>{materialRows=rows;fillSettings(settingsValue);populateMaterialFilters();updateState(state);if(state.status==='running'&&state.operation!=='manual'){showPage('auto');showAutoView('run');}else if(state.operation==='manual'){showPage('manual');}else if(state.result_pending){showPage('auto');showAutoView('result');}connectWebSocket();}).catch(error=>{toast(error.message,true);$('conn-dot').className='dot bad';$('conn-label').textContent='Server Unavailable';setTimeout(()=>location.reload(),3000);});

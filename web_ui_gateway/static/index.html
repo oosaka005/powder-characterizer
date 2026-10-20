@@ -14,19 +14,19 @@
   </header>
 
   <nav id="main-nav" class="main-nav" aria-label="Main menu">
-    <button data-page="auto" class="active"><span class="nav-icon">▶</span><span>Automated</span></button>
+    <button data-page="auto" class="active"><span class="nav-icon">▶</span><span>Evaluation</span></button>
     <button data-page="manual"><span class="nav-icon">⚙</span><span>Manual</span></button>
-    <button data-page="single"><span class="nav-icon">◉</span><span>Single Test</span></button>
     <button data-page="history"><span class="nav-icon">▦</span><span>Results</span></button>
     <button data-page="materials"><span class="nav-icon">▤</span><span>Material DB</span></button>
   </nav>
 
   <main>
     <section id="page-auto" class="page active">
-      <div class="workflow-nav" aria-label="Automated evaluation progress">
+      <div class="workflow-nav" aria-label="Evaluation progress">
         <button data-auto-view="setup" class="active"><span>1</span>Setup</button>
-        <button data-auto-view="run"><span>2</span>Run Status</button>
-        <button data-auto-view="result"><span>3</span>Result</button>
+        <button data-auto-view="select"><span>2</span>Select Evaluation</button>
+        <button data-auto-view="run"><span>3</span>Measurement</button>
+        <button data-auto-view="result"><span>4</span>Result</button>
       </div>
 
       <div id="auto-setup" class="auto-view active">
@@ -79,16 +79,51 @@
             </div>
           </details>
         </div>
-        <div class="sticky-actions"><button class="secondary" id="save-settings">Save Settings</button><button class="primary emphasis" id="save-start">Save and Start Automated Evaluation</button></div>
+        <div class="sticky-actions"><button class="secondary" id="save-settings">Save Settings</button><button class="primary emphasis" id="save-continue">Save and Continue</button></div>
+      </div>
+
+      <div id="auto-select" class="auto-view">
+        <div class="page-title-row"><div><h1>Select Evaluation</h1><p>Choose a complete evaluation, an individual test, or manual data entry.</p></div></div>
+        <section class="evaluation-group" aria-labelledby="automated-evaluation-title">
+          <div class="evaluation-group-heading"><h2 id="automated-evaluation-title">Automated Evaluation</h2><span class="mode-key automated"><span aria-hidden="true">&#9881;</span> Automated</span></div>
+          <div class="evaluation-grid">
+            <button class="test-button evaluation-choice full-evaluation" data-evaluation="automated"><span class="test-icon">ALL</span><span class="test-label"><strong>Full Evaluation</strong><span class="evaluation-sequence"><span>C</span><b>→</b><span>A</span><b>→</b><span>T</span></span></span><span class="mode-indicator automated" aria-label="Automated" title="Automated"><span class="mode-symbol" aria-hidden="true">&#9881;</span><span>AUTO</span></span></button>
+            <button class="test-button evaluation-choice" data-evaluation="calibration"><span class="test-icon">C</span><span class="test-label"><strong>Calibration</strong></span><span class="mode-indicator automated" aria-label="Automated" title="Automated"><span class="mode-symbol" aria-hidden="true">&#9881;</span><span>AUTO</span></span></button>
+            <button class="test-button evaluation-choice" data-evaluation="tapped_density"><span class="test-icon">T</span><span class="test-label"><strong>Tapped Density</strong></span><span class="mode-indicator automated" aria-label="Automated" title="Automated"><span class="mode-symbol" aria-hidden="true">&#9881;</span><span>AUTO</span></span></button>
+            <button class="test-button evaluation-choice" data-evaluation="angle_of_repose"><span class="test-icon">A</span><span class="test-label"><strong>Angle of Repose</strong></span><span class="mode-indicator automated" aria-label="Automated" title="Automated"><span class="mode-symbol" aria-hidden="true">&#9881;</span><span>AUTO</span></span></button>
+          </div>
+        </section>
+        <section class="evaluation-group manual-evaluation-group" aria-labelledby="manual-measurement-title">
+          <div class="evaluation-group-heading"><h2 id="manual-measurement-title">Manual Measurement</h2><span class="mode-key manual"><span aria-hidden="true">&#9995;</span> Manual entry</span></div>
+          <div class="evaluation-grid">
+            <button class="test-button evaluation-choice manual-choice" data-evaluation="bulk_density"><span class="test-icon">B</span><span class="test-label"><strong>Bulk Density</strong></span><span class="mode-indicator manual" aria-label="Manual entry" title="Manual entry"><span class="mode-symbol" aria-hidden="true">&#9995;</span><span>MANUAL</span></span></button>
+          </div>
+        </section>
       </div>
 
       <div id="auto-run" class="auto-view">
-        <div class="page-title-row"><div><h1>Run Status</h1><p>The measurement continues if the browser is closed.</p></div></div>
-        <div class="status-grid">
-          <div class="metric-card"><span>Status</span><strong id="run-status">Idle</strong></div><div class="metric-card"><span>Stage</span><strong id="run-stage">—</strong></div><div class="metric-card"><span>Elapsed time</span><strong id="run-elapsed">0.0 s</strong></div>
+        <div id="automated-measurement" class="measurement-mode active">
+          <div class="page-title-row"><div><h1>Measurement Status</h1><p>The measurement continues if the browser is closed.</p></div></div>
+          <div class="status-grid">
+            <div class="metric-card"><span>Status</span><strong id="run-status">Idle</strong></div><div class="metric-card"><span>Stage</span><strong id="run-stage">—</strong></div><div class="metric-card"><span>Elapsed time</span><strong id="run-elapsed">0.0 s</strong></div>
+          </div>
+          <article class="panel wide run-panel"><progress id="run-progress" value="0" max="1"></progress><div class="button-row"><button class="secondary" id="back-to-selection">Select Evaluation</button><button class="danger" id="abort-run">Abort Measurement</button></div></article>
+          <details class="panel wide log-panel"><summary>Detailed Log</summary><pre id="run-log">Waiting for a measurement.</pre></details>
         </div>
-        <article class="panel wide run-panel"><progress id="run-progress" value="0" max="1"></progress><div class="button-row"><button class="primary" id="start-run">Start Automated Evaluation</button><button class="danger" id="abort-run">Abort Measurement</button><button class="secondary" id="retry-run">Run Again</button></div></article>
-        <details class="panel wide log-panel"><summary>Detailed Log</summary><pre id="run-log">Waiting for a measurement.</pre></details>
+        <div id="bulk-density-measurement" class="measurement-mode">
+          <div class="page-title-row"><div><h1>Manual Bulk Density</h1><p>Enter three mass and untapped-volume measurements.</p></div></div>
+          <article class="panel wide bulk-density-panel">
+            <p id="bulk-density-context" class="dialog-context"></p>
+            <div class="bulk-entry-table" role="table" aria-label="Bulk density replicates">
+              <div class="bulk-entry-header" role="row"><span>Replicate</span><span>Powder mass (g)</span><span>Untapped volume (mL)</span><span>Density (g/mL)</span></div>
+              <div class="bulk-entry-row" role="row"><strong>1</strong><button type="button" class="bulk-value-button" data-row="0" data-field="mass_g" data-numeric-title="Replicate 1 — Powder mass (g)">Enter</button><button type="button" class="bulk-value-button" data-row="0" data-field="volume_ml" data-numeric-title="Replicate 1 — Untapped volume (mL)">Enter</button><output id="bulk-density-0">—</output></div>
+              <div class="bulk-entry-row" role="row"><strong>2</strong><button type="button" class="bulk-value-button" data-row="1" data-field="mass_g" data-numeric-title="Replicate 2 — Powder mass (g)">Enter</button><button type="button" class="bulk-value-button" data-row="1" data-field="volume_ml" data-numeric-title="Replicate 2 — Untapped volume (mL)">Enter</button><output id="bulk-density-1">—</output></div>
+              <div class="bulk-entry-row" role="row"><strong>3</strong><button type="button" class="bulk-value-button" data-row="2" data-field="mass_g" data-numeric-title="Replicate 3 — Powder mass (g)">Enter</button><button type="button" class="bulk-value-button" data-row="2" data-field="volume_ml" data-numeric-title="Replicate 3 — Untapped volume (mL)">Enter</button><output id="bulk-density-2">—</output></div>
+            </div>
+            <div id="bulk-density-summary" class="result-summary compact-summary"><div class="empty-state">Enter mass and volume for all three replicates.</div></div>
+            <div class="button-row"><button id="cancel-bulk-density" type="button" class="secondary">Back to Selection</button><button id="review-bulk-density" type="button" class="primary">Review Result</button></div>
+          </article>
+        </div>
       </div>
 
       <div id="auto-result" class="auto-view">
@@ -115,6 +150,11 @@
           </div>
           <button id="manual_aug" class="toggle-button" role="switch" aria-checked="true"><span class="toggle-track"><span></span></span><span><strong>Use Auger</strong></span></button>
           <div class="button-grid two"><button class="primary" id="manual-run">Dispense Set Count</button><button class="secondary" id="dispense-once">Dispense Once</button><button class="danger span-two" id="clear-clog">Clear Clog</button></div>
+          <section id="manual-feedback" class="manual-feedback" aria-live="polite">
+            <div class="manual-feedback-heading"><span>Dispense Status</span><strong id="manual-run-status">Ready</strong></div>
+            <p id="manual-run-summary">No manual dispense has been run.</p>
+            <pre id="manual-run-log">Waiting for a manual operation.</pre>
+          </section>
         </article>
         <article class="panel">
           <h2>Camera</h2><span class="field-label">Focus mode</span>
@@ -123,17 +163,6 @@
           <div class="button-grid two"><button class="secondary" id="camera-preview">Camera Preview</button><button class="secondary" id="repose-preview">Repose Image Preview</button></div><img id="preview-image" alt="Camera preview">
         </article>
       </div>
-    </section>
-
-    <section id="page-single" class="page">
-      <div class="page-title-row"><div><h1>Single Test</h1><p>Select the test to run.</p></div></div>
-      <div class="single-grid">
-        <button class="test-button single" data-stage="calibration"><span class="test-icon">C</span><span class="test-label"><strong>Calibration</strong></span><span class="mode-indicator automated" aria-label="Automated" title="Automated"><span class="mode-symbol" aria-hidden="true">&#9881;</span><span>AUTO</span></span></button>
-        <button class="test-button single" data-stage="bulk_density"><span class="test-icon">B</span><span class="test-label"><strong>Bulk Density</strong></span><span class="mode-indicator manual" aria-label="Manual" title="Manual"><span class="mode-symbol" aria-hidden="true">&#9995;</span><span>MANUAL</span></span></button>
-        <button class="test-button single" data-stage="tapped_density"><span class="test-icon">T</span><span class="test-label"><strong>Tapped Density</strong></span><span class="mode-indicator automated" aria-label="Automated" title="Automated"><span class="mode-symbol" aria-hidden="true">&#9881;</span><span>AUTO</span></span></button>
-        <button class="test-button single" data-stage="angle_of_repose"><span class="test-icon">A</span><span class="test-label"><strong>Angle of Repose</strong></span><span class="mode-indicator automated" aria-label="Automated" title="Automated"><span class="mode-symbol" aria-hidden="true">&#9881;</span><span>AUTO</span></span></button>
-      </div>
-      <article class="panel preparation-panel"><h2>Test Preparation</h2><div class="button-grid two"><button class="secondary" id="single-dispense">Dispense Once</button><button class="secondary" id="single-capture">Preview Image</button></div></article>
     </section>
 
     <section id="page-history" class="page">
@@ -189,20 +218,6 @@
       <img id="repose-confirm-image" alt="Current powder pile">
       <p>Confirm the material, Disk ID, and powder pile before analysis.</p>
       <div class="repose-dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="retake-repose-image" type="button" class="secondary">Retake Image</button><button id="analyze-repose-image" type="button" class="primary">Analyze Image</button></div>
-    </form>
-  </dialog>
-  <dialog id="bulk-density-dialog" class="touch-dialog bulk-density-dialog">
-    <form method="dialog">
-      <h2>Manual Bulk Density</h2>
-      <p id="bulk-density-context" class="dialog-context"></p>
-      <div class="bulk-entry-table" role="table" aria-label="Bulk density replicates">
-        <div class="bulk-entry-header" role="row"><span>Replicate</span><span>Powder mass (g)</span><span>Untapped volume (mL)</span><span>Density (g/mL)</span></div>
-        <div class="bulk-entry-row" role="row"><strong>1</strong><button type="button" class="bulk-value-button" data-row="0" data-field="mass_g" data-numeric-title="Replicate 1 — Powder mass (g)">Enter</button><button type="button" class="bulk-value-button" data-row="0" data-field="volume_ml" data-numeric-title="Replicate 1 — Untapped volume (mL)">Enter</button><output id="bulk-density-0">—</output></div>
-        <div class="bulk-entry-row" role="row"><strong>2</strong><button type="button" class="bulk-value-button" data-row="1" data-field="mass_g" data-numeric-title="Replicate 2 — Powder mass (g)">Enter</button><button type="button" class="bulk-value-button" data-row="1" data-field="volume_ml" data-numeric-title="Replicate 2 — Untapped volume (mL)">Enter</button><output id="bulk-density-1">—</output></div>
-        <div class="bulk-entry-row" role="row"><strong>3</strong><button type="button" class="bulk-value-button" data-row="2" data-field="mass_g" data-numeric-title="Replicate 3 — Powder mass (g)">Enter</button><button type="button" class="bulk-value-button" data-row="2" data-field="volume_ml" data-numeric-title="Replicate 3 — Untapped volume (mL)">Enter</button><output id="bulk-density-2">—</output></div>
-      </div>
-      <div id="bulk-density-summary" class="result-summary compact-summary"><div class="empty-state">Enter mass and volume for all three replicates.</div></div>
-      <div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button id="save-bulk-density" type="button" class="primary">Save Measurement</button></div>
     </form>
   </dialog>
   <script src="/static/app.js" defer></script>

@@ -40,6 +40,8 @@ def test_manual_sequence_is_vibrate_then_index_and_stops() -> None:
 
     assert result["requested_steps"] == 2
     assert result["succeeded_steps"] == 2
+    assert result["success"] is True
+    assert result["failed_step"] is None
     assert dispenser.calls == [
         ("vibrate_with_auger", 3, 1.25),
         ("index_chamber", 255, 0.65, False),
@@ -47,6 +49,30 @@ def test_manual_sequence_is_vibrate_then_index_and_stops() -> None:
         ("index_chamber", 255, 0.65, False),
         ("stop_all",),
     ]
+
+
+def test_manual_sequence_reports_rotation_motor_stop_reason() -> None:
+    class TimedOutDispenser(FakePowderDispenser):
+        def index_chamber(self, *args, **kwargs):
+            self.calls.append(("index_chamber", 255, 0.65, False))
+            return {"success": False, "stop_reason": "timeout", "elapsed_sec": 0.65}
+
+    dispenser = TimedOutDispenser()
+    result = run_manual_experiment(
+        vib_level=0,
+        vib_seconds=0,
+        dose_count=2,
+        use_aug=False,
+        powder_dispenser=dispenser,
+    )
+
+    assert result["success"] is False
+    assert result["succeeded_steps"] == 0
+    assert result["failed_step"] == {
+        "attempt": 1,
+        "stop_reason": "timeout",
+        "elapsed_sec": 0.65,
+    }
 
 
 def test_measure_series_preserves_pre_vibrate_tare_then_step_vibrate_read() -> None:
