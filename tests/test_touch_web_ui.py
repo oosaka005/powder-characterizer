@@ -118,6 +118,11 @@ class TouchWebUiTests(unittest.TestCase):
         self.assertIn("$('history-charts').replaceChildren()", calibration_branch.group(1))
         self.assertNotIn("chartCard", calibration_branch.group(1))
 
+    def test_result_images_stay_in_the_touch_workflow(self) -> None:
+        self.assertIn(".artifacts { display:flex; flex-direction:column", self.css)
+        self.assertIn("figure img { display:block; width:100%; height:auto", self.css)
+        self.assertNotIn('target="_blank"', self.javascript)
+
     def test_high_consequence_actions_use_confirmation_dialog(self) -> None:
         self.assertIn("confirmAction('Abort Measurement'", self.javascript)
         self.assertIn("confirmAction('Discard Result'", self.javascript)

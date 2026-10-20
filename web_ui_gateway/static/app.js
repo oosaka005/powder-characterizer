@@ -281,7 +281,7 @@ function renderResultSummary(state) {
 function renderArtifacts(state) {
   const box=$('artifacts'), artifacts=state.result?.artifacts||{}, entries=Object.values(artifacts);
   if(!entries.length){box.textContent='No images are available.';return;}
-  box.innerHTML=entries.map(item=>{const filename=String(item.filename||'');const url=`/api/runs/${encodeURIComponent(state.run_id)}/artifacts/${encodeURIComponent(filename)}`;return `<figure><a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="${escapeHtml(filename)}"></a><figcaption>${escapeHtml(filename)}</figcaption></figure>`;}).join('');
+  box.innerHTML=entries.map(item=>{const filename=String(item.filename||'');const url=`/api/runs/${encodeURIComponent(state.run_id)}/artifacts/${encodeURIComponent(filename)}`;return `<figure><img src="${url}" alt="${escapeHtml(filename)}"><figcaption>${escapeHtml(filename)}</figcaption></figure>`;}).join('');
 }
 
 async function saveCurrentResult(){
@@ -567,7 +567,7 @@ function renderHistoryCharts(record){
 function renderHistoryArtifacts(record){
   const artifacts=record.artifacts||[], box=$('history-artifacts');
   if(!artifacts.length){box.innerHTML=record.evaluation==='angle_of_repose'?'<div class="empty-state">No saved images are available.</div>':'';return;}
-  box.innerHTML=artifacts.map(item=>{const url=`/api/results/history/artifact/${encodeURIComponent(item.kind)}/${encodeURIComponent(item.run_id)}/${encodeURIComponent(item.filename)}`;return `<figure><a href="${url}" target="_blank" rel="noopener"><img loading="lazy" src="${url}" alt="${escapeHtml(item.label)}"></a><figcaption>${escapeHtml(item.label)}</figcaption></figure>`;}).join('');
+  box.innerHTML=artifacts.map(item=>{const url=`/api/results/history/artifact/${encodeURIComponent(item.kind)}/${encodeURIComponent(item.run_id)}/${encodeURIComponent(item.filename)}`;return `<figure><img loading="lazy" src="${url}" alt="${escapeHtml(item.label)}"><figcaption>${escapeHtml(item.label)}</figcaption></figure>`;}).join('');
 }
 
 $('history-dispenser').addEventListener('change',rebuildHistoryFilters);
