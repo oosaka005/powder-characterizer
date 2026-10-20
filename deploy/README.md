@@ -100,6 +100,9 @@ The launcher opens `http://localhost:8000` in Chromium kiosk mode. The Web UI
 provides its own touch-accessible Reload button; closing kiosk mode still
 requires a keyboard, SSH, or restarting the Raspberry Pi.
 
+If replacing an earlier copy of the launcher, run the same `install` command
+again so the desktop receives the current version.
+
 The Balance service is bound to the fixed udev device. Removing the Balance
 cable stops the service; reconnecting it to the designated port starts the
 service again. Verify both the mapping and an actual Balance read after
