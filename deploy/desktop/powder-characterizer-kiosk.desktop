@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Powder Characterizer
+Comment=Open the Powder Characterizer touch interface
+Exec=/usr/bin/chromium-browser --kiosk --no-first-run --noerrdialogs --disable-session-crashed-bubble http://localhost:8000
+Icon=chromium-browser
+Terminal=false
+Categories=Utility;
+StartupNotify=true

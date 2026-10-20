@@ -119,8 +119,9 @@ class TouchWebUiTests(unittest.TestCase):
         self.assertNotIn("chartCard", calibration_branch.group(1))
 
     def test_result_images_stay_in_the_touch_workflow(self) -> None:
-        self.assertIn(".artifacts { display:flex; flex-direction:column", self.css)
-        self.assertIn("figure img { display:block; width:100%; height:auto", self.css)
+        self.assertIn(".artifacts { display:flex; flex-direction:column; align-items:center", self.css)
+        self.assertIn(".artifacts figure { width:70%", self.css)
+        self.assertIn(".artifacts figure img { display:block; width:100%; height:auto", self.css)
         self.assertNotIn('target="_blank"', self.javascript)
 
     def test_kiosk_screen_has_touch_reload_control(self) -> None:

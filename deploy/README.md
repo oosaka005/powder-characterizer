@@ -80,6 +80,26 @@ weight read, not only the existence of the device link.
 6. Confirm the first-layer server states, then open
    `http://dispensercontroller.local:8000` from a laptop.
 
+## Touchscreen desktop shortcut
+
+For a dedicated touchscreen, install the included desktop launcher after the
+Web UI services are enabled. Do not enable `powder-flow-kiosk.service` at the
+same time; use either the desktop shortcut for manual launch or the systemd
+unit for automatic launch.
+
+```bash
+mkdir -p "$HOME/Desktop"
+install -m 0755 \
+  /home/sdl-5/powder-flow/deploy/desktop/powder-characterizer-kiosk.desktop \
+  "$HOME/Desktop/Powder Characterizer.desktop"
+```
+
+Double-tap **Powder Characterizer** on the desktop. If the desktop asks whether
+to trust or execute the launcher, select **Execute** or **Allow Launching**.
+The launcher opens `http://localhost:8000` in Chromium kiosk mode. The Web UI
+provides its own touch-accessible Reload button; closing kiosk mode still
+requires a keyboard, SSH, or restarting the Raspberry Pi.
+
 The Balance service is bound to the fixed udev device. Removing the Balance
 cable stops the service; reconnecting it to the designated port starts the
 service again. Verify both the mapping and an actual Balance read after
